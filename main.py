@@ -122,17 +122,18 @@ def main():
     env = registry.make("FourAgentOvercooked-V0", render_mode="human")
     print(env)
     env.reset()
-    for i in range(1000):
-        env.step(
-            {
-                agent_id: env.action_space(agent_id).sample()
-                for agent_id in env.agents
-            }
-        )
-        print({ agent_id: env.action_space(agent_id).sample()
-            for agent_id in env.agents
-        })
-        env.render()
+    #for i in range(1000):
+    #    env.step(
+    #        {
+    #            agent_id: env.action_space(agent_id).sample()
+    #            for agent_id in env.agents
+    #        }
+    #    )
+    #    print({ agent_id: env.action_space(agent_id).sample()
+    #        for agent_id in env.agents
+    #    })
+    #    env.render()
+    
 
 
 if __name__ == "__main__":
