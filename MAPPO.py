@@ -34,7 +34,7 @@ class MAPPO:
     def add_to_buffer(self, obs, actions, rewards, dones, logprobs, values):
         self.buffer.add(obs, actions, rewards, dones, logprobs, values)
 
-    def compute_gae(self, rewards, dones, values, next_values, gamma=0.99, lam=0.95):
+    def compute_gae(self, rewards, dones, values, gamma, lam, next_values):
         """
         Compute Generalized Advantage Estimation (GAE).
 
@@ -71,4 +71,7 @@ class MAPPO:
         """
         # Implement the update logic here
         print("Updating policy with collected data...")
+
+        # compute GAE
+         
         pass
