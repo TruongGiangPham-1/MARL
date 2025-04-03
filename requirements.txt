@@ -1,3 +1,7 @@
 torch
 numpy
 tqdm
+cogrid
+pygame
+supersuit
+categorical

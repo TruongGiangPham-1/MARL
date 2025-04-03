@@ -6,6 +6,16 @@ from cogrid.envs.overcooked import overcooked
 from cogrid.core import layouts
 from cogrid.envs import registry
 
+# import supersuit
+import supersuit as ss
+from model import Agent 
+import torch
+import argparse
+from MAPPO import MAPPO
+from agent_environment import agent_environment_loop
+
+
+
 from overcooked_features import NAgentOvercookedFeatureSpace
 
 # CoGrid is based on a registry system, so we need to register the feature
@@ -119,22 +129,52 @@ registry.register(
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--cuda",
+        action="store_true",
+        default=False,
+        help="Use GPU for training.",
+    )
+    args = parser.parse_args()
+
     env = registry.make("FourAgentOvercooked-V0", render_mode="human")
-    print(env)
     env.reset()
-    #for i in range(1000):
-    #    env.step(
-    #        {
-    #            agent_id: env.action_space(agent_id).sample()
-    #            for agent_id in env.agents
-    #        }
-    #    )
-    #    print({ agent_id: env.action_space(agent_id).sample()
-    #        for agent_id in env.agents
-    #    })
-    #    env.render()
+    #print(f'env obs {env.observation_spaces[0]["n_agent_overcooked_features"].shape}')  # (404)
+    obs, R, terminated, truncated, info = env.step(
+        {
+            agent_id: env.action_space(agent_id).sample()
+            for agent_id in env.agents
+        }
+    )  
+    print(f'{R}, {terminated}, {truncated}')
     
+    """
+    obs spaces:
+    {0: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
+    1: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
+    2: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
+    3: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32))}
+
+    action spaces:
+    {0: Discrete(7), 1: Discrete(7), 2: Discrete(7), 3: Discrete(7)}
+
+    o, r, t, t, i = env.step()
+
+    r = {agent_id: R for agent_id in N}
+    t = {agent_id: terminated for agent_id in N}
+    t = {agent_id: truncated for agent_id in N}
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
+    net = Agent(env).to(device)
+    optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
 
 
+    ppo_agent = MAPPO(env, optimizer, net)
+
+    reward = agent_environment_loop(ppo_agent, env, device, num_episodes=1000)
+
+    return
+    
 if __name__ == "__main__":
     main()
