@@ -13,6 +13,7 @@ import torch
 import argparse
 from MAPPO import MAPPO
 from agent_environment import agent_environment_loop
+from buffer import Buffer
 
 
 
@@ -168,13 +169,14 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
     net = Agent(env).to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
+    buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], max_size=128)
 
 
     collect_steps = 5
 
     single_agent_obs_dim = env.observation_spaces[0]['n_agent_overcooked_features'].shape  # 
     sigle_agent_action_dim = env.action_spaces[0].n  # int
-    ppo_agent = MAPPO(env, optimizer, net, single_agent_obs_dim, sigle_agent_action_dim, collect_steps=collect_steps)
+    ppo_agent = MAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, collect_steps=collect_steps)
 
     reward = agent_environment_loop(ppo_agent, env, device, num_episodes=1000)
 
