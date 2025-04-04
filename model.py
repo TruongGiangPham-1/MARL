@@ -25,8 +25,9 @@ class Agent(nn.Module):
         return self.critic(self.network(x))
 
     def get_action_and_value(self, x, action=None):
+        # x dim (num_agent, concat obs shape)
         hidden = self.network(x)
-        logits = self.actor(hidden)
+        logits = self.actor(hidden)  # dim (num_agent, action_size per agent)
         probs = Categorical(logits=logits)
         if action is None:
             action = probs.sample()

@@ -121,7 +121,14 @@ class MAPPO:
                 mb_inds = b_inds[start:end]             # dim (mini_batch_size,)
                 mb_obs = self.buffer.obs_buff[mb_inds]  # dim (minibatch, num_agents, obs_dim)
                 mb_actions = self.buffer.actions_buff.long()[mb_inds]
+                
+
                 _, newlogprob, entropy, newvalue = self.policy.get_action_and_value(mb_obs, mb_actions)
+                """
+                newlogprob shape (minibatch_size, num_agent)
+                entropy shape (minibatch_size, num_agent)
+                newvalue shape (minibatch_size, num_agent, 1)
+                """
                 logratio = newlogprob - self.buffer.logprobs_buff[mb_inds]
 
                 ratio = logratio.exp()  # dim (mini_batch_size, num_agents)
@@ -133,20 +140,26 @@ class MAPPO:
                         ((ratio - 1.0).abs() > self.clip_param).float().mean().item()
                     )
 
-            mb_advantages = advantages[mb_inds]  # dim (mini_batch_size, num_agents)
+                mb_advantages = advantages[mb_inds]  # dim (mini_batch_size, num_agents)
 
 
-            # policy loss
-            pg_loss1 = -mb_advantages * ratio
-            pg_loss2 = -mb_advantages * torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param)
-            pg_loss = torch.max(pg_loss1, pg_loss2).mean()
+                # policy loss
+                pg_loss1 = -mb_advantages * ratio  # dim (minibatch, num_agent)
+                pg_loss2 = -mb_advantages * torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param)
+                pg_loss = torch.max(pg_loss1, pg_loss2).mean()
 
-            # value loss
-            newvalue = newvalue.view(-1)  # 
+                # value loss (no clipping TODO: clip)
+                newvalue = newvalue.squeeze()  # dim (minibatch_size, num_agents)
+
+                v_loss = 0.5 * (newvalue - mb_advantages **2).mean()  # dim 
+                entropy_loss = entropy.mean()  # dim (1)
+
+                loss = pg_loss - self.entropy_coef * entropy_loss + v_loss * self.value_loss_coef
+
+                self.optimizer.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+                self.optimizer.step()
 
         # Reset the buffer
         self.buffer.reset()
-
-            
-
-        passgg
