@@ -26,4 +26,8 @@ class Buffer(object):
         # Update the pointer and size
         self.ptr = (self.ptr + 1) % self.max_size
         self.size = min(self.size + 1, self.max_size)
+    
+    def reset(self):
+        self.ptr = 0
+        self.size = 0
 

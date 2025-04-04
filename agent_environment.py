@@ -42,33 +42,7 @@ def agent_environment_loop(agent, env, device, num_episodes=1000):
             dones = torch.tensor([terminated[i] or truncated[i] for i in range(agent.num_agents)]).to(device)
 
         # Update the agent with the collected data
-        agent.update()
+        agent.update(obs)
     return []
 
 
-def collect(next_obs, next_dones):
-    """
-    Collects trajectories from the environment.
-
-    Args:
-        obs (torch.Tensor): Observation tensor.
-
-    Returns:
-        trajectory (dict): Collected trajectory data (obs, actions, rewards, etc.).
-    """
-
-
-    for step in range(self.collect_steps): 
-        self.obs[step] = next_obs
-        self.dones[step] = next_dones
-        with torch.no_grad():
-            actions, logprobs, _, values = self.policy.get_action_and_value(next_obs)
-        self.actions[step] = actions
-        assert actions.shape == (self.env.config['num_agents'],)
-        self.logprobs[step] = logprobs
-        self.values[step] = values
-
-
-        # Take a step in the environment
-        env_action = {i: action for i, action in enumerate(actions)}
-        next_obs, rewards, terminated, truncated, info = self.env.step(env_action)
