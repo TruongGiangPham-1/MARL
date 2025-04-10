@@ -137,6 +137,8 @@ def main():
         default=False,
         help="Use GPU for training.",
     )
+    parser.add_argument('--save-path', type=str, default=None, help='Path to save the model')
+    parser.add_argument('--save', action='store_true', default=False, help='Save the model')
     args = parser.parse_args()
 
     env = registry.make("FourAgentOvercooked-V0", render_mode="human")
@@ -176,7 +178,8 @@ def main():
 
     single_agent_obs_dim = env.observation_spaces[0]['n_agent_overcooked_features'].shape  # 
     sigle_agent_action_dim = env.action_spaces[0].n  # int
-    ppo_agent = MAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, collect_steps=collect_steps)
+    ppo_agent = MAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, collect_steps=collect_steps, 
+                       save_path=args.save_path)
 
     reward = agent_environment_loop(ppo_agent, env, device, num_episodes=1000)
 

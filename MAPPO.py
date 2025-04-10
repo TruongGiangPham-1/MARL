@@ -1,12 +1,14 @@
 import torch
 import numpy as np
+import os
 
 class MAPPO:
 
     def __init__(self, env, optimzer, policy, buffer,
             single_agent_obs, single_agent_action,
             collect_steps=128,
-            num_agents=4):
+            num_agents=4, 
+            save_path=None):
         self.env = env
         self.optimizer = optimzer
         self.policy = policy
@@ -27,6 +29,8 @@ class MAPPO:
 
         self.gamma = 0.99
         self.lam = 0.95
+
+        self.save_path = save_path
 
 
 
@@ -161,5 +165,8 @@ class MAPPO:
                 torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
                 self.optimizer.step()
 
+        if self.save_path is not None:
+            torch.save(self.policy.state_dict(), os.path.join(self.save_path, "policy.pth"))
+            print(f'saved model at {self.save_path}')
         # Reset the buffer
         self.buffer.reset()
