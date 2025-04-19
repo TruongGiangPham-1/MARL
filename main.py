@@ -1,4 +1,5 @@
 import functools
+import time
 
 from cogrid.feature_space import feature_space
 from cogrid.envs.overcooked import overcooked
@@ -35,6 +36,7 @@ def main():
     )
     parser.add_argument('--save-path', type=str, default=None, help='Path to save the model')
     parser.add_argument('--save', action='store_true', default=False, help='Save the model')
+    parser.add_argument('--batch-size', type=int, default=5, help='number of sample to collect before update')
     args = parser.parse_args()
 
     env = registry.make("FourAgentOvercooked-V0", render_mode="human")
@@ -70,12 +72,16 @@ def main():
     buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], max_size=128)
 
 
-    collect_steps = 5
+    collect_steps = args.batch_size
+
+    import os
+    os.mkdir("logs", exist_ok=True)
+    log_dir = f"logs/run__{int(time.time())}"
 
     single_agent_obs_dim = env.observation_spaces[0]['n_agent_overcooked_features'].shape  # 
     sigle_agent_action_dim = env.action_spaces[0].n  # int
     ppo_agent = MAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, collect_steps=collect_steps, 
-                       save_path=args.save_path)
+                       save_path=args.save_path, log_dir=log_dir)
 
     reward = agent_environment_loop(ppo_agent, env, device, num_episodes=1000)
 

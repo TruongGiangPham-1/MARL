@@ -2,7 +2,7 @@
 import torch
 
 
-def agent_environment_loop(agent, env, device, num_episodes=1000):
+def agent_environment_loop(agent, env, device, num_episodes=1000, log_dir=None):
     """
     agent: mappo agent
     """
