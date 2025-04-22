@@ -70,10 +70,17 @@ def mpe_environment_loop(agent, env, device, num_episodes=1000, log_dir=None):
 
             next_obs, rewards, terminated, truncated, info = env.step(env_action)
             """
-            rewards = {agent_id: R for agent_id in N}
+            next_obs = {agent_id: obs for agent_id in N}          {} if torch.all(dones)
+            rewards = {agent_id: R for agent_id in N}             {} if torch.all(dones)
             terminated = {agent_id: terminated for agent_id in N}
-            truncated = {agent_id: truncated for agent_id in N}
+            truncated = {agent_id: truncated for agent_id in N}   {} if torch.all(dones)
             """
+            if torch.all(dones):
+                # handle reset 
+                next_obs, info = env.reset()
+                obs = torch.stack([   torch.FloatTensor(next_obs[a]) for a in (env.possible_agents)], dim=0).to(device)
+                dones = torch.zeros((env.num_agents,)).to(device)
+                continue
 
             print(f'rewards before {rewards} env.agents {env.possible_agents} done {dones} truncated {truncated}')
             rewards = torch.tensor([rewards[a] for a in (env.possible_agents)]).to(device)  # dim (num_agents,)
