@@ -26,8 +26,22 @@ def main():
     parser.add_argument('--batch-size', type=int, default=5, help='number of sample to collect before update')
     args = parser.parse_args()
 
-    env = simple_spread_v3.parallel_env()  # the overcooked game engine
+    env = simple_spread_v3.parallel_env()  
+    """
+    env.agents = ['agent_0', 'agent_1', 'agent_2'] a list of active agentID string. 
+
+    env.agents parameter only gets populated after reset() in aec_to_parallel_wrapper
+    https://github.com/Farama-Foundation/PettingZoo/blob/a977ae32ce88709171c45e03911671c480c4f9e0/pettingzoo/utils/conversions.py#L105
+
+    agentID in env.agents get removed when they dies
+    https://github.com/Farama-Foundation/PettingZoo/blob/a977ae32ce88709171c45e03911671c480c4f9e0/pettingzoo/utils/env.py#L226 
+
+    obs = env.step() is a dict of obs for each agent
+    the dict is empty is episode is done , but not emty when truncated
+    """
     env.reset()
+    print(f'possible agents = {env.possible_agents}')
+    print(f'current active agents  = {env.agents}')
 
 
     print(f'obs {env.observation_spaces["agent_0"].shape}')  # (18 ,)
