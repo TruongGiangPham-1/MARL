@@ -74,26 +74,38 @@ def mpe_environment_loop(agent, env, device, num_episodes=1000, log_dir=None):
             rewards = {agent_id: R for agent_id in N}             {} if torch.all(dones)
             terminated = {agent_id: terminated for agent_id in N}
             truncated = {agent_id: truncated for agent_id in N}   {} if torch.all(dones)
+
+            TODO: how can I handle truncated and terminated. when rewards is empty.
+            Simple_spread reward is sum of all agents distance to the target. So making terminated reward 0 is a problem.
             """
-            if torch.all(dones):
-                # handle reset 
-                next_obs, info = env.reset()
-                obs = torch.stack([   torch.FloatTensor(next_obs[a]) for a in (env.possible_agents)], dim=0).to(device)
-                dones = torch.zeros((env.num_agents,)).to(device)
-                continue
+            full_rewards = torch.zeros((env.num_agents)).to(device)
+            for aval_agent_str in env.agents:
+                agent_id = int(aval_agent_str.split('_')[1])
+                full_rewards[agent_id] = rewards[aval_agent_str]
+                
 
             print(f'rewards before {rewards} env.agents {env.possible_agents} done {dones} truncated {truncated}')
-            rewards = torch.tensor([rewards[a] for a in (env.possible_agents)]).to(device)  # dim (num_agents,)
+            rewards = full_rewards
 
             #print(f'size of stuff adding to buffer {obs.shape}, {actions.shape}, {rewards.shape}, {dones.shape}, {logprobs.shape}, {values.squeeze(1).shape}')
             agent.add_to_buffer(obs, actions, rewards, dones, logprobs, values.squeeze(1))
 
 
+            if torch.all(dones):
+                # handle reset 
+                next_obs, info = env.reset()
+                obs = torch.stack([   torch.FloatTensor(next_obs[a]) for a in (env.possible_agents)], dim=0).to(device)
             obs = torch.stack([   torch.FloatTensor(next_obs[a]) for a in (env.possible_agents)], dim=0).to(device)
             dones = torch.tensor([terminated[a] or truncated[a] for a in (env.possible_agents)]).to(device)
+
 
         # Update the agent with the collected data
         agent.update(obs)
     return []
 
 
+
+"""
+Problem: in MPE, 
+
+"""

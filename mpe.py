@@ -38,10 +38,18 @@ def main():
 
     obs = env.step() is a dict of obs for each agent
     the dict is empty is episode is done , but not emty when truncated
+
+
+    env.agents is empty when truncated
+
+    Rewards:
+    - "More specifically, all agents are globally rewarded based on how far the closest agent is to each landmark (sum of the minimum distances)."
+    - shared reward for all agents. So the reward is a single number for all agents.
     """
-    env.reset()
+    o, info = env.reset()
     print(f'possible agents = {env.possible_agents}')
     print(f'current active agents  = {env.agents}')
+    print(f'default obs {o}')
 
 
     print(f'obs {env.observation_spaces["agent_0"].shape}')  # (18 ,)
