@@ -20,6 +20,7 @@ registry.register(
 
 
 def main():
+    num_agents = 4
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
     parser = argparse.ArgumentParser()
     
@@ -63,6 +64,16 @@ def main():
     }
 
     print(f'action: {action}')
+
+
+    # ----------------------------------------------------------
+    # constructing custom input 
+    print(f'Inputting custom input to the model. Must be a tensor of shape (num_agents, 404)')
+    # (num_agents, 404) of random numbers
+    custom_input = torch.randn((num_agents, 404)).to(device)
+
+    action, _, _, _ = mappo.act(custom_input)  # action is a vector with dimention (num_agents,)
+    print(f'Resulting action is : {action}')
     return
 
 
