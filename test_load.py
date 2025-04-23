@@ -73,6 +73,13 @@ def main():
     custom_input = torch.randn((num_agents, 404)).to(device)
 
     action, _, _, _ = mappo.act(custom_input)  # action is a vector with dimention (num_agents,)
+
+    action = {  # 
+        "agent_0": action[0].item(),   # Discrete(7)
+        "agent_1": action[1].item(),   # Discrete(7)
+        "agent_2": action[2].item(),   # Discrete(7)
+        "agent_3": action[3].item()    # Discrete(7)
+    }
     print(f'Resulting action is : {action}')
     return
 
