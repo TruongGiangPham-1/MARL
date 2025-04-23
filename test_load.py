@@ -39,8 +39,8 @@ def main():
     mappo = MAPPO(env, None, nn, None, None, None)  # THE RL AGENT
     obs, info = env.reset() 
     """
-    observvation for each agents, each agent's state vector is sized 404
-
+    INPUT ----------
+    is an observvation for each agents, each agent's state vector is sized 404
     obs: {
         0: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
         1: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
@@ -48,7 +48,7 @@ def main():
         3: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32))
     }
     """
-    # combine the observations of all agents into a single tensor. shape (num_agents, 404)
+    # combine the observations of all agents into a single matrix. shape (num_agents, 404)
     state = torch.stack([   torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(mappo.num_agents)], dim=0).to(device)
 
 
