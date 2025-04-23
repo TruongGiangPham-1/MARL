@@ -53,15 +53,16 @@ def main():
 
 
     # actions for each agents. Each agent action is in the range of 0 to 6
-    action = mappo.act(state)
-    """
-    action: {
-        0: Discrete(7), 
-        1: Discrete(7), 
-        2: Discrete(7), 
-        3: Discrete(7)
+    action, _, _, _ = mappo.act(state)  # action is a vector with dimention (num_agents,)
+
+    action = {  # 
+        "agent_0": action[0].item(),   # Discrete(7)
+        "agent_1": action[1].item(),   # Discrete(7)
+        "agent_2": action[2].item(),   # Discrete(7)
+        "agent_3": action[3].item()    # Discrete(7)
     }
-    """
+
+    print(f'action: {action}')
     return
 
 
