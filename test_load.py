@@ -81,6 +81,12 @@ def main():
         "agent_3": action[3].item()    # Discrete(7)
     }
     print(f'Resulting action is : {action}')
+
+
+    # ----------------------- One agent ---------------------------
+    action, _, _, _ = mappo.act(custom_input[0].unsqueeze(0))  # custom_input[0] is a tensor of shape (1, 404)
+
+    print(f'Resulting action for agent 0 is : {action[0].item()}')  # action is a vector with dimention (num_agents,)
     return
 
 
