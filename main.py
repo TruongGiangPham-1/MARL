@@ -5,7 +5,7 @@ from cogrid.feature_space import feature_space
 from cogrid.envs.overcooked import overcooked
 from cogrid.core import layouts
 from cogrid.envs import registry
-from overcooked_config import four_agent_overcooked_config
+from overcooked_config import N_agent_overcooked_config
 
 # import supersuit
 import supersuit as ss
@@ -16,15 +16,26 @@ from MAPPO import MAPPO
 from agent_environment import agent_environment_loop
 from buffer import Buffer
 
-# Finally, we register the environment with CoGrid. This makes it convenient
-# to instantiate the environment from the registry as we do below, but you could
-# also just pass the config to the Overcooked constructor directly.
-registry.register(
-    "FourAgentOvercooked-V0",
-    functools.partial(
-        overcooked.Overcooked, config=four_agent_overcooked_config
-    ),
-)
+
+def make_env(num_agents=4, layout="large_overcooked_layout", render_mode="human"):
+    config = N_agent_overcooked_config.copy()  # get config obj
+    config["num_agents"] = num_agents
+    config["grid"]["layout"] = layout
+
+    # Finally, we register the environment with CoGrid. This makes it convenient
+    # to instantiate the environment from the registry as we do below, but you could
+    # also just pass the config to the Overcooked constructor directly.
+    registry.register(
+        "NAgentOvercooked-V0",
+        functools.partial(
+            overcooked.Overcooked, config=config
+        ),
+    )
+    return registry.make(
+        "NAgentOvercooked-V0",
+        render_mode=render_mode,
+    )
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -34,12 +45,14 @@ def main():
         default=False,
         help="Use GPU for training.",
     )
+    parser.add_argument('--num-agents', type=int, default=4, help='number of agents')
+    parser.add_argument('--layout', type=str, default='large_overcooked_layout', help='layout')
     parser.add_argument('--save-path', type=str, default=None, help='Path to save the model')
     parser.add_argument('--save', action='store_true', default=False, help='Save the model')
     parser.add_argument('--batch-size', type=int, default=5, help='number of sample to collect before update')
     args = parser.parse_args()
-
-    env = registry.make("FourAgentOvercooked-V0", render_mode="human")
+    print(f'num_agents: {args.num_agents}, layout: {args.layout}, save_path: {args.save_path}, batch_size: {args.batch_size}')
+    env = make_env(args.num_agents, layout=args.layout)
     env.reset()
 
     obs_space = env.observation_spaces[0]['n_agent_overcooked_features']  # box (-inf, inf, (404,), float32)
@@ -84,7 +97,7 @@ def main():
     single_agent_obs_dim = env.observation_spaces[0]['n_agent_overcooked_features'].shape  # 
     sigle_agent_action_dim = env.action_spaces[0].n  # int
     ppo_agent = MAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, collect_steps=collect_steps, 
-                       save_path=args.save_path, log_dir=log_dir)
+                       save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents)
 
     reward = agent_environment_loop(ppo_agent, env, device, num_episodes=1000)
 

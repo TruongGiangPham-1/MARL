@@ -64,8 +64,8 @@ layouts.register_layout("large_overcooked_layout", large_layout)
 # Now, we specify the configuration for the environment.
 # In the near future this will be a configuration class
 # to make the arguments clearer, but for now it's a dictionary:
-four_agent_overcooked_config = {
-    "name": "FourAgentOvercooked-V0",
+N_agent_overcooked_config = {
+    "name": "NAgentOvercooked-V0",
     "num_agents": 4,
     # We have two different ways to represent actions in CoGrid.
     # Both have common actions of No-Op, Toggle, and Pickup/Drop.
@@ -104,6 +104,19 @@ four_agent_overcooked_config = {
     "grid": {"layout": "large_overcooked_layout"},
     # Number of steps per episode.
     "max_steps": 1000,
-    "num_agents": 4,
+    #"num_agents": 4,
 }
 
+
+#two_agent_overcooked_config = {
+#    "name": "TwoAgentOvercooked-V0",
+#    "num_agents": 2,
+#    "action_set": "cardinal_actions",
+#    "features": "n_agent_overcooked_features",
+#    "rewards": ["delivery_reward"],
+#    "scope": "overcooked",
+#    "grid": {"layout": "CrampedRoom"},
+#    # Number of steps per episode.
+#    "max_steps": 1000,
+#    "num_agents": 4,
+#}

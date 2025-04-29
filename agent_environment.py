@@ -38,7 +38,6 @@ def agent_environment_loop(agent, env, device, num_episodes=1000, log_dir=None):
 
             agent.add_to_buffer(obs, actions, rewards, dones, logprobs, values.squeeze(1))
 
-
             obs = torch.stack([   torch.FloatTensor(next_obs[i]['n_agent_overcooked_features']) for i in range(agent.num_agents)], dim=0).to(device)
             dones = torch.tensor([terminated[i] or truncated[i] for i in range(agent.num_agents)]).to(device)
 
