@@ -41,6 +41,9 @@ def main():
 
     env = registry.make("FourAgentOvercooked-V0", render_mode="human")
     env.reset()
+
+    obs_space = env.observation_spaces[0]['n_agent_overcooked_features']  # box (-inf, inf, (404,), float32)
+    action_space = env.action_spaces[0]  # Discrete(7)
     #print(f'env obs {env.observation_spaces[0]["n_agent_overcooked_features"].shape}')  # (404)
     obs, R, terminated, truncated, info = env.step(
         {
@@ -67,7 +70,7 @@ def main():
     t = {agent_id: truncated for agent_id in N}
     """
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
-    net = Agent(env).to(device)
+    net = Agent(obs_space, action_space).to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
     buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], max_size=128)
 
@@ -75,7 +78,7 @@ def main():
     collect_steps = args.batch_size
 
     import os
-    os.mkdir("logs", exist_ok=True)
+    os.makedirs("logs", exist_ok=True)
     log_dir = f"logs/run__{int(time.time())}"
 
     single_agent_obs_dim = env.observation_spaces[0]['n_agent_overcooked_features'].shape  # 

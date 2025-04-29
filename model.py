@@ -10,15 +10,15 @@ from torch.distributions.categorical import Categorical
 
 class Agent(nn.Module):
     # from clearn RL https://github.com/vwxyzjn/cleanrl/blob/master/cleanrl/ppo_pettingzoo_ma_atari.py
-    def __init__(self, env):
+    def __init__(self, obs_space, action_space):
         super().__init__()
         self.network = nn.Sequential(
-            nn.Linear(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], 512),  # Adjust for 1D input
+            nn.Linear(obs_space.shape[0], 512),  # Adjust for 1D input
             nn.ReLU(),
             nn.Linear(512, 256),
             nn.ReLU(),
         )
-        self.actor = nn.Linear(256, env.action_spaces[0].n)
+        self.actor = nn.Linear(256, action_space.n)
         self.critic = nn.Linear(256, 1)  # remove
 
     def get_value(self, x):
