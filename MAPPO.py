@@ -7,21 +7,21 @@ class MAPPO:
 
     def __init__(self, env, optimzer, policy, buffer,
             single_agent_obs, single_agent_action,
-            collect_steps=128,
+            batch_size=128,
+            num_mini_batches=4,
             num_agents=4, 
             save_path=None, log_dir=None, log=False):
         self.env = env
         self.optimizer = optimzer
         self.policy = policy
 
-        self.collect_steps = collect_steps
         self.num_agents = num_agents
         self.single_agent_obs = single_agent_obs  # tuple
         self.single_agent_action = single_agent_action
         self.buffer = buffer
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.batch_size = self.collect_steps
-        self.mini_batch_size = self.batch_size // 4
+        self.batch_size = batch_size
+        self.mini_batch_size = self.batch_size // num_mini_batches
         self.ppo_epoch = 10
         self.clip_param = 0.2
         self.value_loss_coef = 0.5

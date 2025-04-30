@@ -50,7 +50,10 @@ def main():
     parser.add_argument('--layout', type=str, default='large_overcooked_layout', help='layout')
     parser.add_argument('--save-path', type=str, default=None, help='Path to save the model')
     parser.add_argument('--save', action='store_true', default=False, help='Save the model')
+    parser.add_argument('--total-steps', type=int, default=1000, help='total env steps')
     parser.add_argument('--batch-size', type=int, default=5, help='number of sample to collect before update')
+    parser.add_argument('--num-minibatches', type=int, default=4, help='')
+
     parser.add_argument('--centralised', action='store_true', default=False, help='False is decentralised, True is centralised')
     args = parser.parse_args()
     print(f'num_agents: {args.num_agents}, layout: {args.layout}, save_path: {args.save_path}, batch_size: {args.batch_size}')
@@ -89,9 +92,6 @@ def main():
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
     buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], max_size=128)
 
-
-    collect_steps = args.batch_size
-
     import os
     os.makedirs("logs", exist_ok=True)
     log_dir = f"logs/run__{int(time.time())}"
@@ -100,13 +100,15 @@ def main():
     sigle_agent_action_dim = env.action_spaces[0].n  # int
     if not args.centralised:
         print(f'Using decentralised critic')
-        ppo_agent = MAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, collect_steps=collect_steps, 
+        ppo_agent = MAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
+                          num_mini_batches=args.num_minibatches,
                         save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents)
     else:
         print(f'Using centralised critic')
-        ppo_agent = CMAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, collect_steps=collect_steps, 
+        ppo_agent = CMAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
+                           num_mini_batches=args.num_minibatches,
                         save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents)
-    reward = agent_environment_loop(ppo_agent, env, device, num_episodes=1000)
+    reward = agent_environment_loop(ppo_agent, env, device, num_update=args.total_steps // args.batch_size)
 
     return
     
