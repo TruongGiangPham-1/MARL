@@ -151,6 +151,7 @@ class MAPPO:
                     )
 
                 mb_advantages = advantages[mb_inds]  # dim (mini_batch_size, num_agents)
+                #centralized_mb_advantages = mb_advantages.mean(dim=1, keepdim=True)  # dim (mini_batch_size, 1)
 
 
                 # policy loss
@@ -161,7 +162,9 @@ class MAPPO:
                 # value loss (no clipping TODO: clip)
                 newvalue = newvalue.squeeze()  # dim (minibatch_size, num_agents)
 
-                v_loss = 0.5 * (newvalue - mb_advantages **2).mean()  # dim 
+                v_loss = self.compute_value_loss(mb_advantages, newvalue)  # dim (mini_batch_size, num_agents)
+
+
                 entropy_loss = entropy.mean()  # dim (1)
 
                 loss = pg_loss - self.entropy_coef * entropy_loss + v_loss * self.value_loss_coef
@@ -188,3 +191,10 @@ class MAPPO:
             print(f'saved model at {self.save_path}')
         # Reset the buffer
         self.buffer.reset()
+    
+    def compute_value_loss(self, mb_advantages, newvalue):
+        """
+        Compute the value loss.
+        """
+        v_loss = 0.5 * (newvalue - mb_advantages **2).mean()
+        return v_loss
