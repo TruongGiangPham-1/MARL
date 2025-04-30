@@ -72,8 +72,8 @@ class MAPPO:
         Args:
             rewards (torch.Tensor): shape (num_steps, num_agents)
             dones (torch.Tensor): shape (num_steps, num_agents)
-            values [V(S_i)]: shape (num_steps, num_agents) or (num_steps, 1) for CMAPPO
-            next_values (torch.Tensor): shape (1, num_agents) for MAPPO or (1, 1) for CMAPPO
+            values [V(S_i)]: shape (num_steps, num_agents)
+            next_values (torch.Tensor): shape (1, num_agents)
             gamma (float): Discount factor.
             lam (float): Lambda for GAE.
 
@@ -86,11 +86,11 @@ class MAPPO:
             for t in reversed(range(self.buffer.max_size)):
                 if t ==  self.buffer.max_size - 1:
                     mask = 1.0 - dones[-1]  # shape (num_agents,)
-                    nextvalues = next_values           # shape (1, num_agents) or (1, 1) for CMAPPO
+                    nextvalues = next_values           # shape (1, num_agents)
                 else:
                     mask = 1.0 - dones[t + 1]    # shape (num_agents,)
-                    nextvalues = values[t + 1]             # shape (num_agents,) or (1, 1) for CMAPPO
-                delta = rewards[t] + self.gamma * nextvalues * mask - values[t]  # A: r_t + \gamma*V(s_t+1) - V(s_t)    shape (num_agents,) or (1, 1) for CMAPPO
+                    nextvalues = values[t + 1]             # shape (num_agents,)
+                delta = rewards[t] + self.gamma * nextvalues * mask - values[t]  # A: r_t + \gamma*V(s_t+1) - V(s_t)    shape (num_agents,)
 
                 advantages[t] = lastgaelam = delta + self.gamma * self.lam * mask * lastgaelam  # shape (num_agents,)
 

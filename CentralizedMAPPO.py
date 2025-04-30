@@ -1,5 +1,6 @@
 
 from MAPPO import MAPPO
+import torch
 
 
 # inherit from MAPPO
@@ -28,5 +29,40 @@ class CMAPPO(MAPPO):
         value_loss = 0.5 * ((new_values - centralized_adv)**2).mean()
         return value_loss
 
+    def compute_gae(self, rewards, dones, values, next_values):
+        """
+        Compute Generalized Advantage Estimation (GAE) using centralised critic.
+        adapt from clearn rl https://github.com/vwxyzjn/cleanrl/blob/master/cleanrl/ppo_pettingzoo_ma_atari.py
+
+        only difference is that I use mean of the rewards with computing TD error delta
+
+        Args:
+            rewards (torch.Tensor): shape (num_steps, num_agents)
+            dones (torch.Tensor): shape (num_steps, num_agents)
+            values [V(S_i)]: shape (num_steps, 1)
+            next_values (torch.Tensor): shape (1, 1) for CMAPPO
+            gamma (float): Discount factor.
+            lam (float): Lambda for GAE.
+
+        Returns:
+            advantages (torch.Tensor): Computed advantages.
+        """
+        with torch.no_grad():
+            advantages = torch.zeros_like(rewards).to(self.device)  # shape (num_steps, num_agents)
+            lastgaelam  = torch.zeros(self.num_agents).to(self.device)
+            for t in reversed(range(self.buffer.max_size)):
+                if t ==  self.buffer.max_size - 1:
+                    mask = 1.0 - dones[-1]  # shape (num_agents,)
+                    nextvalues = next_values           # shape (1, num_agents) or (1, 1) for CMAPPO
+                else:
+                    mask = 1.0 - dones[t + 1]    # shape (num_agents,)
+                    nextvalues = values[t + 1]             # shape (num_agents,) or (1, 1) for CMAPPO
+
+                rewards_t = rewards[t].mean()  # scalar, the only difference from MAPPO
+
+                delta = rewards_t + self.gamma * nextvalues * mask - values[t]  # A: r_t + \gamma*V(s_t+1) - V(s_t)    shape (num_agents,) or (1, 1) for CMAPPO
+
+                advantages[t] = lastgaelam = delta + self.gamma * self.lam * mask * lastgaelam  # shape (num_agents,)
+        return advantages 
 
     
