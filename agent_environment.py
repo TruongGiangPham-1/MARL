@@ -7,7 +7,7 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
     """
     agent: mappo agent
     """
-    collect_steps = agent.collect_steps
+    collect_steps = agent.batch_size
     num_updates = 5    
 
     # TODO: move this to replay buffer
