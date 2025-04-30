@@ -13,6 +13,7 @@ from model import Agent
 import torch
 import argparse
 from MAPPO import MAPPO
+from CentralizedMAPPO import CMAPPO
 from agent_environment import agent_environment_loop
 from buffer import Buffer
 
@@ -50,6 +51,7 @@ def main():
     parser.add_argument('--save-path', type=str, default=None, help='Path to save the model')
     parser.add_argument('--save', action='store_true', default=False, help='Save the model')
     parser.add_argument('--batch-size', type=int, default=5, help='number of sample to collect before update')
+    parser.add_argument('--centralised', action='store_true', default=False, help='False is decentralised, True is centralised')
     args = parser.parse_args()
     print(f'num_agents: {args.num_agents}, layout: {args.layout}, save_path: {args.save_path}, batch_size: {args.batch_size}')
     env = make_env(args.num_agents, layout=args.layout)
@@ -83,7 +85,7 @@ def main():
     t = {agent_id: truncated for agent_id in N}
     """
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
-    net = Agent(obs_space, action_space).to(device)
+    net = Agent(obs_space, action_space, num_agents=args.num_agents).to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
     buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], max_size=128)
 
@@ -96,9 +98,14 @@ def main():
 
     single_agent_obs_dim = env.observation_spaces[0]['n_agent_overcooked_features'].shape  # 
     sigle_agent_action_dim = env.action_spaces[0].n  # int
-    ppo_agent = MAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, collect_steps=collect_steps, 
-                       save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents)
-
+    if not args.centralised:
+        print(f'Using decentralised critic')
+        ppo_agent = MAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, collect_steps=collect_steps, 
+                        save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents)
+    else:
+        print(f'Using centralised critic')
+        ppo_agent = CMAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, collect_steps=collect_steps, 
+                        save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents)
     reward = agent_environment_loop(ppo_agent, env, device, num_episodes=1000)
 
     return
