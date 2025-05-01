@@ -81,6 +81,20 @@ class NAgentOvercookedFeatureSpace(feature.Feature):
         full_shape = num_agents * np.sum(
             [feature.shape for feature in self.agent_features]
         )
+        #feature_sum = 0
+        #feature_dict = {
+
+        #}
+        #for feature in self.agent_features:
+        #    print(
+        #        f"Feature: {feature.name}, shape: {feature.shape}"
+        #    )
+        #    if feature.name not in feature_dict:
+        #        feature_dict[feature.name] = 0
+        #    feature_dict[feature.name] += 1
+        #    feature_sum += feature.shape[0]
+        #print(f"Total feature shape: {feature_sum}")
+        #print(f"Feature dict: {feature_dict}")
 
         super().__init__(
             low=-np.inf,

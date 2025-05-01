@@ -5,3 +5,4 @@ cogrid
 pygame
 supersuit
 categorical
+opencv-python
