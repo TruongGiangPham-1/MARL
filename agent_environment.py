@@ -3,6 +3,7 @@ import torch
 import numpy as np
 
 from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 
 
 def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
@@ -19,7 +20,7 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
     obs = torch.stack([     torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(agent.num_agents)], dim=0).to(device)
     dones = torch.zeros((agent.num_agents,)).to(device)
     global_step = 0
-    for _ in range(num_update):
+    for _ in tqdm(range(num_update)):
         for step in range(collect_steps):
             actions, logprobs, _, values = agent.act(obs)  # with no grad action dim (num_agents,)
             """

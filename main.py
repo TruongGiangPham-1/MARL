@@ -34,7 +34,7 @@ def make_env(num_agents=4, layout="large_overcooked_layout", render_mode="human"
     )
     return registry.make(
         "NAgentOvercooked-V0",
-        render_mode=render_mode,
+        render_mode=None,
     )
 
 
@@ -102,13 +102,13 @@ def main():
         print(f'Using decentralised critic')
         ppo_agent = MAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
                           num_mini_batches=args.num_minibatches,
-                        save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents)
+                        save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=True)
     else:
         print(f'Using centralised critic')
         ppo_agent = CMAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
                            num_mini_batches=args.num_minibatches,
-                        save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents)
-    reward = agent_environment_loop(ppo_agent, env, device, num_update=args.total_steps // args.batch_size)
+                        save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=True)
+    reward = agent_environment_loop(ppo_agent, env, device, num_update=args.total_steps // args.batch_size, log_dir=log_dir)
 
     return
     

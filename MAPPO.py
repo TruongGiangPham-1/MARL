@@ -114,7 +114,6 @@ class MAPPO:
             values (torch.Tensor): Value tensor.
         """
         # Implement the update logic here
-        print(f"Updating policy with {self.buffer.size} collected data...")
 
         # compute GAE
         with torch.no_grad():
@@ -195,18 +194,17 @@ class MAPPO:
                 self.optimizer.step()
 
                 if self.log:
-                    self.summary_writer.add_scalar('policy_')
-                    self.writer.add_scalar("charts/learning_rate", self.optimizer.param_groups[0]["lr"], self.num_gradient_steps)
-                    self.writer.add_scalar("losses/value_loss", v_loss.item(), self.num_gradient_steps)
-                    self.writer.add_scalar("losses/policy_loss", pg_loss.item(), )
-                    self.writer.add_scalar("losses/entropy", entropy_loss.item(), self.num_gradient_steps)
-                    self.writer.add_scalar("losses/old_approx_kl", old_approx_kl.item(), self.num_gradient_steps)
-                    self.writer.add_scalar("losses/approx_kl", approx_kl.item(), self.num_gradient_steps)
-                    self.writer.add_scalar("losses/clipfrac", np.mean(clipfracs), self.num_gradient_steps)
+                    self.summary_writer.add_scalar("charts/learning_rate", self.optimizer.param_groups[0]["lr"], self.num_gradient_steps)
+                    self.summary_writer.add_scalar("losses/value_loss", v_loss.item(), self.num_gradient_steps)
+                    self.summary_writer.add_scalar("losses/policy_loss", pg_loss.item(), )
+                    self.summary_writer.add_scalar("losses/entropy", entropy_loss.item(), self.num_gradient_steps)
+                    #self.writer.add_scalar("losses/old_approx_kl", old_approx_kl.item(), self.num_gradient_steps)
+                    #self.writer.add_scalar("losses/approx_kl", approx_kl.item(), self.num_gradient_steps)
+                    #self.writer.add_scalar("losses/clipfrac", np.mean(clipfracs), self.num_gradient_steps)
 
         self.num_gradient_steps += 1
 
-        if self.save_path is not None:
+        if self.save_path is not None and self.num_gradient_steps % 100 == 0:
             torch.save(self.policy.state_dict(), os.path.join(self.save_path, "policy.pth"))
             print(f'saved model at {self.save_path}')
         # Reset the buffer
