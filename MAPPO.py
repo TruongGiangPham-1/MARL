@@ -20,6 +20,8 @@ class MAPPO:
         self.single_agent_action = single_agent_action
         self.buffer = buffer
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f'device inside MAPPO {self.device}')
+
         self.batch_size = batch_size
         self.mini_batch_size = self.batch_size // num_mini_batches
         self.ppo_epoch = 10
@@ -52,9 +54,10 @@ class MAPPO:
             action (torch.Tensor): Action tensor.
         """
         with torch.no_grad():
+            obs = obs.to(self.device)  # dim (num_agents, obs_dim)
             if type(self).__name__ == "CMAPPO":
                 # convert obs to joint_obs. obs dim (num_agents, obs_dim) to (1, num_agents * obs_dim)
-                joint_obs = obs.view(1, -1)
+                joint_obs = obs.view(1, -1).to(self.device)
                 action, logprob, entropy, values = self.policy.get_action_and_value(obs, joint_obs=joint_obs)
             elif type(self).__name__ == "MAPPO":
                 action, logprob, entropy, values = self.policy.get_action_and_value(obs)

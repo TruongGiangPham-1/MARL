@@ -2,11 +2,14 @@
 import torch
 import numpy as np
 
+from torch.utils.tensorboard import SummaryWriter
+
 
 def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
     """
     agent: mappo agent
     """
+    summary_writer = SummaryWriter(log_dir=log_dir)
     collect_steps = agent.batch_size
     num_updates = 5    
 
@@ -15,7 +18,7 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
     obs, info = env.reset()  # obs is a dict of obs for each agent
     obs = torch.stack([     torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(agent.num_agents)], dim=0).to(device)
     dones = torch.zeros((agent.num_agents,)).to(device)
-
+    global_step = 0
     for _ in range(num_update):
         for step in range(collect_steps):
             actions, logprobs, _, values = agent.act(obs)  # with no grad action dim (num_agents,)
@@ -33,13 +36,19 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
             terminated = {agent_id: terminated for agent_id in N}
             truncated = {agent_id: truncated for agent_id in N}
             """
+            
 
             rewards = torch.tensor([rewards[i] for i in range(agent.num_agents)]).to(device)  # dim (num_agents,)
+
+
+            summary_writer.add_scalar('rewards', rewards.float().mean().item(), global_step)
 
             agent.add_to_buffer(obs, actions, rewards, dones, logprobs, values.squeeze(1))
 
             obs = torch.stack([   torch.FloatTensor(next_obs[i]['n_agent_overcooked_features']) for i in range(agent.num_agents)], dim=0).to(device)
             dones = torch.tensor([terminated[i] or truncated[i] for i in range(agent.num_agents)]).to(device)
+
+            global_step += 1
 
         # Update the agent with the collected data
         agent.update(obs)

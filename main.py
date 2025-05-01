@@ -87,7 +87,7 @@ def main():
     t = {agent_id: terminated for agent_id in N}
     t = {agent_id: truncated for agent_id in N}
     """
-    device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net = Agent(obs_space, action_space, num_agents=args.num_agents).to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
     buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], max_size=128)
