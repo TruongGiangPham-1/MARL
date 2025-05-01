@@ -16,6 +16,8 @@ from MAPPO import MAPPO
 from CentralizedMAPPO import CMAPPO
 from agent_environment import agent_environment_loop
 from buffer import Buffer
+from plot import plot_alg_results
+import pandas as pd
 
 
 def make_env(num_agents=4, layout="large_overcooked_layout", render_mode="human"):
@@ -99,6 +101,7 @@ def main():
 
     import os
     os.makedirs("logs", exist_ok=True)
+    os.makedirs("data", exist_ok=True)  # contain .csv files of returns
     log_dir = f"logs/run__{int(time.time())}"
 
     single_agent_obs_dim = env.observation_spaces[0]['n_agent_overcooked_features'].shape  # 
@@ -113,8 +116,11 @@ def main():
         ppo_agent = CMAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
                            num_mini_batches=args.num_minibatches,
                         save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log)
-    reward = agent_environment_loop(ppo_agent, env, device, num_update=args.total_steps // args.batch_size, log_dir=log_dir)
-
+    episode_returns = agent_environment_loop(ppo_agent, env, device, num_update=args.total_steps // args.batch_size, log_dir=log_dir)
+    print(f'episode returns {episode_returns}')
+    #plot_alg_results(episode_returns, f"results/{args.num_agents}_{args.layout}.png", label="PPO", ylabel="Return")
+    df = pd.DataFrame(episode_returns)
+    df.to_csv(f'data/{args.num_agents}_{args.layout}_returns.csv', index=False)
     return
     
 if __name__ == "__main__":

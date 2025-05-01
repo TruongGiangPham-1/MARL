@@ -6,3 +6,5 @@ pygame
 supersuit
 categorical
 opencv-python
+pandas
+matplotlib
