@@ -1,6 +1,6 @@
 import numpy as np
 from model import Agent
-from overcooked_config import four_agent_overcooked_config
+from overcooked_config import N_agent_overcooked_config
 import functools
 from cogrid.envs.overcooked import overcooked
 from cogrid.envs import registry
@@ -11,16 +11,29 @@ import torch
 from MAPPO import MAPPO
 #env
 
-registry.register(
-    "FourAgentOvercooked-V0",
-    functools.partial(
-        overcooked.Overcooked, config=four_agent_overcooked_config
-    ),
-)
+def make_env(num_agents=4, layout="large_overcooked_layout", render_mode="human"):
+    config = N_agent_overcooked_config.copy()  # get config obj
+    config["num_agents"] = num_agents
+    config["grid"]["layout"] = layout
+
+    # Finally, we register the environment with CoGrid. This makes it convenient
+    # to instantiate the environment from the registry as we do below, but you could
+    # also just pass the config to the Overcooked constructor directly.
+    registry.register(
+        "NAgentOvercooked-V0",
+        functools.partial(
+            overcooked.Overcooked, config=config
+        ),
+    )
+    return registry.make(
+        "NAgentOvercooked-V0",
+        render_mode=render_mode,
+    )
 
 
 def main():
-    num_agents = 4
+    num_agents = 2
+    layout = "overcooked_cramped_room_v0"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
     parser = argparse.ArgumentParser()
     
@@ -33,11 +46,13 @@ def main():
     )
     args = parser.parse_args()
 
-    env = registry.make("FourAgentOvercooked-V0")  # the overcooked game engine
-    nn = Agent(env).to(device)  # neural network
+    env = make_env(num_agents=num_agents, layout=layout, render_mode=None)
+    obs_space = env.observation_spaces[0]['n_agent_overcooked_features']  # box (-inf, inf, (404,), float32)
+    action_space = env.action_spaces[0]  # Discrete(7)
+    nn = Agent(obs_space, action_space, num_agents=num_agents).to(device)  # neural network
     nn.load_state_dict(torch.load(args.model_path))
 
-    mappo = MAPPO(env, None, nn, None, None, None)  # THE RL AGENT
+    mappo = MAPPO(env, None, nn, None, None, None, num_agents=num_agents)  # THE RL AGENT
     obs, info = env.reset() 
     """
     INPUT ----------
@@ -56,6 +71,7 @@ def main():
     # actions for each agents. Each agent action is in the range of 0 to 6
     action, _, _, _ = mappo.act(state)  # action is a vector with dimention (num_agents,)
 
+    print(f'action: {action}')
     action = {  # 
         "agent_0": action[0].item(),   # Discrete(7)
         "agent_1": action[1].item(),   # Discrete(7)
