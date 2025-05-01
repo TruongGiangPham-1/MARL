@@ -34,7 +34,7 @@ def make_env(num_agents=4, layout="large_overcooked_layout", render_mode="human"
     )
     return registry.make(
         "NAgentOvercooked-V0",
-        render_mode=None,
+        render_mode=render_mode,
     )
 
 
@@ -53,11 +53,16 @@ def main():
     parser.add_argument('--total-steps', type=int, default=1000, help='total env steps')
     parser.add_argument('--batch-size', type=int, default=5, help='number of sample to collect before update')
     parser.add_argument('--num-minibatches', type=int, default=4, help='')
+    parser.add_argument('--log', action='store_true', default=False, help='log the training to tensorboard')
+    parser.add_argument('--render', action='store_true', default=False, help='render the env')
 
     parser.add_argument('--centralised', action='store_true', default=False, help='False is decentralised, True is centralised')
     args = parser.parse_args()
     print(f'num_agents: {args.num_agents}, layout: {args.layout}, save_path: {args.save_path}, batch_size: {args.batch_size}')
-    env = make_env(args.num_agents, layout=args.layout)
+
+
+    render_mode = "human" if args.render else None
+    env = make_env(args.num_agents, layout=args.layout, render_mode=render_mode)
     env.reset()
 
     obs_space = env.observation_spaces[0]['n_agent_overcooked_features']  # box (-inf, inf, (404,), float32)
@@ -102,12 +107,12 @@ def main():
         print(f'Using decentralised critic')
         ppo_agent = MAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
                           num_mini_batches=args.num_minibatches,
-                        save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=True)
+                        save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log)
     else:
         print(f'Using centralised critic')
         ppo_agent = CMAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
                            num_mini_batches=args.num_minibatches,
-                        save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=True)
+                        save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log)
     reward = agent_environment_loop(ppo_agent, env, device, num_update=args.total_steps // args.batch_size, log_dir=log_dir)
 
     return
