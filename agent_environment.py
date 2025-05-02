@@ -43,12 +43,11 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
             
 
             rewards = torch.tensor([rewards[i] for i in range(agent.num_agents)]).to(device)  # dim (num_agents,)
-            episode_reward += rewards.mean().item()  # undiscounted reward
+            episode_reward += rewards.float().mean().item()  # undiscounted reward
 
             #if rewards.float().mean().item() > 0:
             #    print(f'global_step {global_step} rewards {rewards.float().mean().item()} non 0')
 
-            summary_writer.add_scalar('rewards', rewards.float().mean().item(), global_step)
 
             agent.add_to_buffer(obs, actions, rewards, dones, logprobs, values.squeeze(1))
 
@@ -56,6 +55,7 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
                 # handle reset 
                 next_obs, info = env.reset()
                 episodes_reward.append(episode_reward)
+                summary_writer.add_scalar('episode_rewards', episode_reward, global_step)
                 episode_reward = 0
             obs = torch.stack([   torch.FloatTensor(next_obs[i]['n_agent_overcooked_features']) for i in range(agent.num_agents)], dim=0).to(device)
             dones = torch.tensor([terminated[i] or truncated[i] for i in range(agent.num_agents)]).to(device)

@@ -2,3 +2,8 @@ __pycache__/
 
 *.pth
 env/
+video/
+gifenv/
+gifs/
+logs/
+data/
