@@ -4,8 +4,10 @@
 - `python >= 3.10`
 - `virtualenv env && source env/bin/activate`
 - pip3 install -r requirements.txt
-## Running instruction
-- `python3 main.py --save --save-path models --num-agents 4 --layout large_overcooked_layout ` or `make all` with makefile
+## Running instruction '
+python3 main.py --save --save-path models --num-agents 4 --layout large_overcooked_layout--centralised --batch-size 128 --num-minibatches 4 \
+	--total-steps 1000000 --log` 
+or `make all` with makefile
 
 current supported `layout`s are registered [here](https://github.com/chasemcd/cogrid/blob/f1beb729cf3ff8a939f385396a235007a5b2dd76/cogrid/envs/__init__.py#L13)
 ## Test Running the model
