@@ -17,12 +17,14 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
     # TODO: move this to replay buffer
     episodes_reward = []
     episode_reward = 0  # undiscount reward
+    num_episdes = 0
 
 
     obs, info = env.reset()  # obs is a dict of obs for each agent
     obs = torch.stack([     torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(agent.num_agents)], dim=0).to(device)
     dones = torch.zeros((agent.num_agents,)).to(device)
     global_step = 0
+    
     for _ in tqdm(range(num_update)):
         for step in range(collect_steps):
             actions, logprobs, _, values = agent.act(obs)  # with no grad action dim (num_agents,)
@@ -55,8 +57,9 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
                 # handle reset 
                 next_obs, info = env.reset()
                 episodes_reward.append(episode_reward)
-                summary_writer.add_scalar('episode_rewards', episode_reward, global_step)
+                summary_writer.add_scalar('episode_rewards', episode_reward, num_episdes)
                 episode_reward = 0
+                num_episdes += 1
             obs = torch.stack([   torch.FloatTensor(next_obs[i]['n_agent_overcooked_features']) for i in range(agent.num_agents)], dim=0).to(device)
             dones = torch.tensor([terminated[i] or truncated[i] for i in range(agent.num_agents)]).to(device)
 
