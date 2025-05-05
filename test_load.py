@@ -46,7 +46,7 @@ def main():
     )
     args = parser.parse_args()
 
-    env = make_env(num_agents=num_agents, layout=layout, render_mode=None)
+    env = make_env(num_agents=num_agents, layout=layout, render_mode="human")
     obs_space = env.observation_spaces[0]['n_agent_overcooked_features']  # box (-inf, inf, (404,), float32)
     action_space = env.action_spaces[0]  # Discrete(7)
     nn = Agent(obs_space, action_space, num_agents=num_agents).to(device)  # neural network
@@ -54,6 +54,21 @@ def main():
 
     mappo = MAPPO(env, None, nn, None, None, None, num_agents=num_agents)  # THE RL AGENT
     obs, info = env.reset() 
+    obs = torch.stack([   torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(mappo.num_agents)], dim=0).to(device)
+
+    while True:
+        actions, _, _, _ = mappo.act(obs)  # action is a vector with dimention (num_agents,)
+        env_action = {i: action for i, action in enumerate(actions)}
+        obs, rewards, terminated, truncated, info = env.step(
+            env_action
+        )  
+        done = torch.tensor([terminated[i] or truncated[i] for i in range(mappo.num_agents)]).to(device)
+        if torch.all(done):
+            print(f'termianteed')
+            obs, info = env.reset()  # obs is a dict of obs for each agentj
+            break
+        obs = torch.stack([   torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(mappo.num_agents)], dim=0).to(device)
+    return
     """
     INPUT ----------
     is an observvation for each agents, each agent's state vector is sized 404
@@ -103,7 +118,6 @@ def main():
     action, _, _, _ = mappo.act(custom_input[0].unsqueeze(0))  # custom_input[0] is a tensor of shape (1, 404)
 
     print(f'Resulting action for agent 0 is : {action[0].item()}')  # action is a vector with dimention (num_agents,)
-    return
 
 
 if __name__ == "__main__":

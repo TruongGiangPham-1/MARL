@@ -10,13 +10,13 @@ class CMAPPO(MAPPO):
                  batch_size=128,
                  num_mini_batches=4,
                  num_agents=4,
-                 save_path=None, log_dir=None, log=False):
+                 save_path=None, log_dir=None, log=False, args=None):
         super().__init__(env, optimzer, policy, buffer,
                          single_agent_obs, single_agent_action,
                          batch_size=batch_size,
                          num_mini_batches=num_mini_batches,
                          num_agents=num_agents,
-                         save_path=save_path, log_dir=log_dir, log=log)
+                         save_path=save_path, log_dir=log_dir, log=log, args=args)
         
     
     def compute_value_loss(self, target, new_values):

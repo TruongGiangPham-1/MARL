@@ -10,7 +10,7 @@ class MAPPO:
             batch_size=128,
             num_mini_batches=4,
             num_agents=4, 
-            save_path=None, log_dir=None, log=False):
+            save_path=None, log_dir=None, log=False, args=None):
         self.env = env
         self.optimizer = optimzer
         self.policy = policy
@@ -21,6 +21,7 @@ class MAPPO:
         self.buffer = buffer
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f'device inside MAPPO {self.device}')
+        print(f'args.num_agents: {self.num_agents}, args.layout: {args.layout}, args.seed: {args.seed}')
 
         self.batch_size = batch_size
         self.mini_batch_size = self.batch_size // num_mini_batches
@@ -35,6 +36,7 @@ class MAPPO:
 
         self.save_path = save_path
         self.log_dir = log_dir
+        self.args = args
 
         self.summary_writer = SummaryWriter(log_dir=log_dir)
         self.log = log  # whether to log or not
@@ -205,7 +207,8 @@ class MAPPO:
         self.num_gradient_steps += 1
 
         if self.save_path is not None and self.num_gradient_steps % 100 == 0:
-            torch.save(self.policy.state_dict(), os.path.join(self.save_path, "policy.pth"))
+            torch.save(self.policy.state_dict(), os.path.join(self.save_path, f"policy_{self.args.num_agents} \
+                                                              _agents_{self.args.layout}_seed_{self.args.seed}.pth"))
             print(f'saved model at {self.save_path}')
         # Reset the buffer
         self.buffer.reset()

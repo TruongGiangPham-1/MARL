@@ -57,6 +57,7 @@ def main():
     parser.add_argument('--num-minibatches', type=int, default=4, help='')
     parser.add_argument('--log', action='store_true', default=False, help='log the training to tensorboard')
     parser.add_argument('--render', action='store_true', default=False, help='render the env')
+    parser.add_argument('--seed', type=int, default=1,  help='seed')
 
     parser.add_argument('--centralised', action='store_true', default=False, help='False is decentralised, True is centralised')
     args = parser.parse_args()
@@ -110,17 +111,17 @@ def main():
         print(f'Using decentralised critic')
         ppo_agent = MAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
                           num_mini_batches=args.num_minibatches,
-                        save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log)
+                        save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log, args=args)
     else:
         print(f'Using centralised critic')
         ppo_agent = CMAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
                            num_mini_batches=args.num_minibatches,
-                        save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log)
+                        save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log, args=args)
     episode_returns = agent_environment_loop(ppo_agent, env, device, num_update=args.total_steps // args.batch_size, log_dir=log_dir)
     print(f'episode returns {episode_returns}')
     #plot_alg_results(episode_returns, f"results/{args.num_agents}_{args.layout}.png", label="PPO", ylabel="Return")
     df = pd.DataFrame(episode_returns)
-    df.to_csv(f'data/{args.num_agents}_{args.layout}_returns.csv', index=False)
+    df.to_csv(f'data/{args.num_agents}_{args.layout}_returns_seed_{args.seed}.csv', index=False)
     return
     
 if __name__ == "__main__":
