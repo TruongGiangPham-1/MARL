@@ -128,3 +128,60 @@ class NAgentOvercookedFeatureSpace(feature.Feature):
             encoded_features.append(feature.generate(env, player_id))
 
         return np.hstack(encoded_features)
+
+
+class SuccessfullyDeliveredSoup(feature.Feature):
+    """
+    A feature that returns 1 if the agent has successfully delivered a soup, 0 otherwise.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            low=0,
+            high=1,
+            shape=(1,),
+            name="successfully_delivered_soup",
+            **kwargs,
+        )
+        self._is_done = False
+    
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        # env.grid impl see https://github.com/chasemcd/cogrid/blob/main/cogrid/core/grid.py
+        # example in reward.py where it checks if the agent is facing delivery zone
+        # https://github.com/chasemcd/cogrid/blob/f1beb729cf3ff8a939f385396a235007a5b2dd76/cogrid/envs/overcooked/rewards.py#L63
+        agent = env.grid.grid_agents[player_id]
+        agent_holding_soup = any(  # whether the agent is holding a soup
+            [
+                isinstance(obj, overcooked_grid_objects.OnionSoup)
+                for obj in agent.inventory
+            ]
+        )
+        # check if agent is facing a delivery zone
+        forward_pos = agent.front_pos  # [x, y] of the tile in front of the agent
+        forward_tile = env.grid.get(*forward_pos)  # get gridObj at fwd_pos
+
+        agent_facing_delivery_zone = isinstance(
+            forward_tile, overcooked_grid_objects.DeliveryZone
+        )
+
+        if agent_holding_soup and agent_facing_delivery_zone:
+            # UhOH we dont know if the agent will drop the soup.... nvm. we can tell by the reward. was a good exercise though
+            return np.array([0], dtype=np.float32)
+        else:
+            return np.array([1], dtype=np.float32)
+        
+
+"""
+        for grid_obj in env.grid.grid:
+            if grid_obj is None:
+                continue
+            # Check if the grid obj is what we're looking for
+            is_focal_obj = isinstance(
+                grid_obj, self.focal_object_type
+            ) and not np.array_equal(agent.pos, grid_obj.pos)
+
+            obj_is_placed_on = isinstance(
+                grid_obj.obj_placed_on, self.focal_object_type
+            )
+
+"""
