@@ -18,6 +18,9 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
     episodes_reward = []
     episode_reward = 0  # undiscount reward
     num_episdes = 0
+    frequency_delivery_per_episode = 0
+    frequency_plated_per_episode = 0  # how many times agent plated the food
+    frequency_ingredient_in_pot_per_episode = 0  # how many times agent put ingredient in pot
 
 
     obs, info = env.reset()  # obs is a dict of obs for each agent
@@ -45,6 +48,15 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
             
 
             rewards = torch.tensor([rewards[i] for i in range(agent.num_agents)]).to(device)  # dim (num_agents,)
+
+            # if there is 1 in rewards tensor, print hello
+            if torch.any(rewards >= 1):
+                frequency_delivery_per_episode += 1
+                print(f'global_step {global_step} agent sucessfully delievered. rewards {rewards}')
+            if torch.any(rewards == 0.3):
+                frequency_plated_per_episode += 1
+            if torch.any(rewards == 0.1):
+                frequency_ingredient_in_pot_per_episode += 1
             episode_reward += rewards.float().mean().item()  # undiscounted reward
 
             #if rewards.float().mean().item() > 0:
@@ -57,9 +69,17 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
                 # handle reset 
                 next_obs, info = env.reset()
                 episodes_reward.append(episode_reward)
-                summary_writer.add_scalar('episode_rewards', episode_reward, num_episdes)
+                if log_dir is not None:
+                    summary_writer.add_scalar('episode_rewards', episode_reward, num_episdes)
+                    summary_writer.add_scalar('freq/frequency_delivery_per_episode', frequency_delivery_per_episode, num_episdes)
+                    summary_writer.add_scalar('freq/frequency_plated_per_episode', frequency_plated_per_episode, num_episdes)
+                    summary_writer.add_scalar('freq/frequency_ingredient_in_pot_per_episode', frequency_ingredient_in_pot_per_episode, num_episdes)
                 episode_reward = 0
+                frequency_delivery_per_episode = 0
+                frequency_plated_per_episode = 0
+                frequency_ingredient_in_pot_per_episode = 0
                 num_episdes += 1
+
             obs = torch.stack([   torch.FloatTensor(next_obs[i]['n_agent_overcooked_features']) for i in range(agent.num_agents)], dim=0).to(device)
             dones = torch.tensor([terminated[i] or truncated[i] for i in range(agent.num_agents)]).to(device)
 
