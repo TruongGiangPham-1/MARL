@@ -6,6 +6,8 @@ from cogrid.envs.overcooked import overcooked
 from cogrid.core import layouts
 from cogrid.envs import registry
 from overcooked_config import N_agent_overcooked_config
+import random
+import numpy as np
 
 # import supersuit
 import supersuit as ss
@@ -63,6 +65,11 @@ def main():
     args = parser.parse_args()
     print(f'num_agents: {args.num_agents}, layout: {args.layout}, save_path: {args.save_path}, batch_size: {args.batch_size}')
 
+    # TRY NOT TO MODIFY: seeding
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.backends.cudnn.deterministic = True
 
     render_mode = "human" if args.render else None
     env = make_env(args.num_agents, layout=args.layout, render_mode=render_mode)

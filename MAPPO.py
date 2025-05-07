@@ -165,8 +165,8 @@ class MAPPO:
                 ratio = logratio.exp()  # dim (mini_batch_size, num_agents)
 
                 with torch.no_grad():
-                    old_approx_kl = (-logratio).mean()
-                    approx_kl = ((ratio - 1) - logratio).mean()
+                    old_approx_kl = (-logratio).mean()    # k1 approxiatino
+                    approx_kl = ((ratio - 1) - logratio).mean()  # k3: lower variance than k1 estimator
                     clipfracs.append(
                         ((ratio - 1.0).abs() > self.clip_param).float().mean().item()
                     )
@@ -200,6 +200,10 @@ class MAPPO:
                     self.summary_writer.add_scalar("losses/value_loss", v_loss.item(), self.num_gradient_steps)
                     self.summary_writer.add_scalar("losses/policy_loss", pg_loss.item(), self.num_gradient_steps)
                     self.summary_writer.add_scalar("losses/entropy", entropy_loss.item(), self.num_gradient_steps)
+                    self.summary_writer.add_scalar("NN/policy_grad_norm", self.get_grad_norm(self.policy), self.num_gradient_steps)
+                    self.summary_writer.add_scalar("losses/approx_kl", approx_kl.item(), self.num_gradient_steps)
+                    self.summary_writer.add_scalar("losses/old_approx_kl", old_approx_kl.item(), self.num_gradient_steps)
+
                     #self.writer.add_scalar("losses/old_approx_kl", old_approx_kl.item(), self.num_gradient_steps)
                     #self.writer.add_scalar("losses/approx_kl", approx_kl.item(), self.num_gradient_steps)
                     #self.writer.add_scalar("losses/clipfrac", np.mean(clipfracs), self.num_gradient_steps)
@@ -213,6 +217,14 @@ class MAPPO:
         # Reset the buffer
         self.buffer.reset()
     
+    def get_grad_norm(self, nn):
+        total_norm = 0
+        for p in nn.parameters():
+            if p.grad is not None:
+                param_norm = p.grad.detach().data.norm(2)
+                total_norm += param_norm.item() ** 2
+        return total_norm ** (0.5)
+
     def compute_value_loss(self, target, newvalue):
         """
         Compute the value loss.
