@@ -58,6 +58,13 @@ class Agent(nn.Module):
         else:
             v = self.critic(hidden)
         return action, probs.log_prob(action), probs.entropy(), v
+    
+    def get_prob(self, x):
+        # x dim (num_agent, concat obs shape)
+        hidden = self.network(x)
+        logits = self.actor(hidden)
+        probs = Categorical(logits=logits)
+        return probs
 
 
 class CentralizedCritic(nn.Module):

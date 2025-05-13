@@ -124,11 +124,22 @@ def main():
         ppo_agent = CMAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
                            num_mini_batches=args.num_minibatches,
                         save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log, args=args)
-    episode_returns = agent_environment_loop(ppo_agent, env, device, num_update=args.total_steps // args.batch_size, log_dir=log_dir)
+    episode_returns, freq_dict = agent_environment_loop(ppo_agent, env, device, num_update=args.total_steps // args.batch_size, log_dir=log_dir)
     print(f'episode returns {episode_returns}')
     #plot_alg_results(episode_returns, f"results/{args.num_agents}_{args.layout}.png", label="PPO", ylabel="Return")
     df = pd.DataFrame(episode_returns)
     df.to_csv(f'data/{args.num_agents}_{args.layout}_returns_seed_{args.seed}.csv', index=False)
+
+    df = pd.DataFrame(freq_dict["frequency_delivery_per_episode"])
+    df.to_csv(f'data/{args.num_agents}_{args.layout}_frequency_delivery_per_episode_seed_{args.seed}.csv', index=False)
+    df = pd.DataFrame(freq_dict["frequency_plated_per_episode"])
+    df.to_csv(f'data/{args.num_agents}_{args.layout}_frequency_plated_per_episode_seed_{args.seed}.csv', index=False)
+    df = pd.DataFrame(freq_dict["frequency_ingredient_in_pot_per_episode"])
+
+    # save args to file
+    with open(f'data/{args.num_agents}_{args.layout}_args_seed_{args.seed}.txt', 'w') as f:
+        for arg in vars(args):
+            f.write(f"{arg}: {getattr(args, arg)}\n")
     return
     
 if __name__ == "__main__":

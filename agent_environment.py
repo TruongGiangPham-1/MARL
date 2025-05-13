@@ -1,10 +1,13 @@
 # loop
+import os
 import torch
 import numpy as np
+import imageio
 
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
+from utils import evaluate_state
 
 def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
     """
@@ -26,6 +29,8 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
     frequency_plated_per_episode_list = []
     frequency_ingredient_in_pot_per_episode_list = []
 
+    # action prob frames
+    action_prob_frames = []
 
     obs, info = env.reset()  # obs is a dict of obs for each agent
     obs = torch.stack([     torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(agent.num_agents)], dim=0).to(device)
@@ -96,6 +101,10 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
 
         # Update the agent with the collected data
         agent.update(obs)
+
+        image = evaluate_state(agent, env, device, global_step=global_step)
+        image = imageio.imread(image)
+        action_prob_frames.append(image)
     
     freq_dict = {
         'frequency_delivery_per_episode': frequency_delivery_per_episode_list,
@@ -103,7 +112,12 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
         'frequency_ingredient_in_pot_per_episode': frequency_ingredient_in_pot_per_episode_list
     }
 
+    # save gif
+    imageio.mimsave("data/action_prob.gif", action_prob_frames)
     return episodes_reward, freq_dict
+
+
+
 
 def mpe_environment_loop(agent, env, device, num_episodes=1000, log_dir=None):
     """
