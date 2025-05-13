@@ -105,7 +105,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net = Agent(obs_space, action_space, num_agents=args.num_agents).to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
-    buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], max_size=128)
+    buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], max_size=args.batch_size)
 
     import os
     os.makedirs("logs", exist_ok=True)
