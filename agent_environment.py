@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from utils import evaluate_state
 
-def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
+def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None, args=None):
     """
     agent: mappo agent
     """
@@ -113,7 +113,7 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
     }
 
     # save gif
-    imageio.mimsave("data/action_prob.gif", action_prob_frames)
+    imageio.mimsave(f"data/{args.num_agents}_{args.layout}_seed_{args.seed}_action_prob_frames.gif", action_prob_frames)
     return episodes_reward, freq_dict
 
 
