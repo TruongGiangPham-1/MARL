@@ -22,6 +22,10 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
     frequency_plated_per_episode = 0  # how many times agent plated the food
     frequency_ingredient_in_pot_per_episode = 0  # how many times agent put ingredient in pot
 
+    frequency_delivery_per_episode_list = []
+    frequency_plated_per_episode_list = []
+    frequency_ingredient_in_pot_per_episode_list = []
+
 
     obs, info = env.reset()  # obs is a dict of obs for each agent
     obs = torch.stack([     torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(agent.num_agents)], dim=0).to(device)
@@ -74,6 +78,11 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
                     summary_writer.add_scalar('freq/frequency_delivery_per_episode', frequency_delivery_per_episode, num_episdes)
                     summary_writer.add_scalar('freq/frequency_plated_per_episode', frequency_plated_per_episode, num_episdes)
                     summary_writer.add_scalar('freq/frequency_ingredient_in_pot_per_episode', frequency_ingredient_in_pot_per_episode, num_episdes)
+                
+                frequency_delivery_per_episode_list.append(frequency_delivery_per_episode)
+                frequency_plated_per_episode_list.append(frequency_plated_per_episode)
+                frequency_ingredient_in_pot_per_episode_list.append(frequency_ingredient_in_pot_per_episode)
+
                 episode_reward = 0
                 frequency_delivery_per_episode = 0
                 frequency_plated_per_episode = 0
@@ -87,7 +96,14 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None):
 
         # Update the agent with the collected data
         agent.update(obs)
-    return episodes_reward
+    
+    freq_dict = {
+        'frequency_delivery_per_episode': frequency_delivery_per_episode_list,
+        'frequency_plated_per_episode': frequency_plated_per_episode_list,
+        'frequency_ingredient_in_pot_per_episode': frequency_ingredient_in_pot_per_episode_list
+    }
+
+    return episodes_reward, freq_dict
 
 def mpe_environment_loop(agent, env, device, num_episodes=1000, log_dir=None):
     """
