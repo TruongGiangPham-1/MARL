@@ -1,0 +1,12 @@
+torch
+numpy
+tqdm
+cogridA    # uses numpy < 2
+pygame
+supersuit
+categorical
+opencv-python
+pandas
+matplotlib
+tensorboard
+imageio==2.34.1  # last version that uses numpy < 2
