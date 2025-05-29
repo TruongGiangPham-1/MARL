@@ -50,7 +50,7 @@ def main():
     obs_space = env.observation_spaces[0]['n_agent_overcooked_features']  # box (-inf, inf, (404,), float32)
     action_space = env.action_spaces[0]  # Discrete(7)
     nn = Agent(obs_space, action_space, num_agents=num_agents).to(device)  # neural network
-    nn.load_state_dict(torch.load(args.model_path))
+    nn.load_state_dict(torch.load(args.model_path, map_location=device))  # load the model
 
     mappo = MAPPO(env, None, nn, None, None, None, num_agents=num_agents)  # THE RL AGENT
     obs, info = env.reset() 

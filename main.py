@@ -136,6 +136,7 @@ def main():
     df = pd.DataFrame(freq_dict["frequency_plated_per_episode"])
     df.to_csv(f'data/{args.num_agents}_{args.layout}_frequency_plated_per_episode_seed_{args.seed}.csv', index=False)
     df = pd.DataFrame(freq_dict["frequency_ingredient_in_pot_per_episode"])
+    df.to_csv(f'data/{args.num_agents}_{args.layout}_frequency_ingredient_in_pot_per_episode_seed_{args.seed}.csv', index=False)
 
     # save args to file
     with open(f'data/{args.num_agents}_{args.layout}_args_seed_{args.seed}.txt', 'w') as f:

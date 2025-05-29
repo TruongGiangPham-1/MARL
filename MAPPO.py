@@ -20,8 +20,6 @@ class MAPPO:
         self.single_agent_action = single_agent_action
         self.buffer = buffer
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f'device inside MAPPO {self.device}')
-        print(f'args.num_agents: {self.num_agents}, args.layout: {args.layout}, args.seed: {args.seed}')
 
         self.batch_size = batch_size
         self.mini_batch_size = self.batch_size // num_mini_batches
