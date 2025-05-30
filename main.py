@@ -60,6 +60,27 @@ def main():
     parser.add_argument('--log', action='store_true', default=False, help='log the training to tensorboard')
     parser.add_argument('--render', action='store_true', default=False, help='render the env')
     parser.add_argument('--seed', type=int, default=1,  help='seed')
+    
+    # ppo args
+    """
+            ppo_epoch=10,
+            clip_param=0.2,
+            value_loss_coef=0.5,
+            entropy_coef=0.01,
+            max_grad_norm=0.5,
+            gamma=0.99,
+            lam=0.95,
+    
+    """
+    parser.add_argument('--ppo-epoch', type=int, default=10, help='number of ppo epochs')
+    parser.add_argument('--clip-param', type=float, default=0.2, help='ppo clip parameter')
+    parser.add_argument('--value-loss-coef', type=float, default=0.5, help='value loss coefficient')
+    parser.add_argument('--entropy-coef', type=float, default=0.01, help='entropy coefficient')
+    parser.add_argument('--max-grad-norm', type=float, default=0.5, help='max gradient norm')
+    parser.add_argument('--gamma', type=float, default=0.99, help='discount factor')
+    parser.add_argument('--lam', type=float, default=0.95, help='lambda for GAE')
+    
+
 
     parser.add_argument('--centralised', action='store_true', default=False, help='False is decentralised, True is centralised')
     args = parser.parse_args()
@@ -117,12 +138,16 @@ def main():
     if not args.centralised:
         print(f'Using decentralised critic')
         ppo_agent = MAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
-                          num_mini_batches=args.num_minibatches,
+                          num_mini_batches=args.num_minibatches, ppo_epoch=args.ppo_epoch, clip_param=args.clip_param,
+                        value_loss_coef=args.value_loss_coef, entropy_coef=args.entropy_coef, max_grad_norm=args.max_grad_norm,
+                        gamma=args.gamma, lam=args.lam,
                         save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log, args=args)
     else:
         print(f'Using centralised critic')
         ppo_agent = CMAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
-                           num_mini_batches=args.num_minibatches,
+                           num_mini_batches=args.num_minibatches, ppo_epoch=args.ppo_epoch, clip_param=args.clip_param,
+                        value_loss_coef=args.value_loss_coef, entropy_coef=args.entropy_coef, max_grad_norm=args.max_grad_norm,
+                        gamma=args.gamma, lam=args.lam,
                         save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log, args=args)
     episode_returns, freq_dict = agent_environment_loop(ppo_agent, env, device, num_update=args.total_steps // args.batch_size, log_dir=log_dir,
                                                         args=args)
