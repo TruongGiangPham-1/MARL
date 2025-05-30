@@ -10,12 +10,26 @@ class CMAPPO(MAPPO):
                  batch_size=128,
                  num_mini_batches=4,
                  num_agents=4,
+                ppo_epoch=10,
+                clip_param=0.2,
+                value_loss_coef=0.5,
+                entropy_coef=0.01,
+                max_grad_norm=0.5,
+                gamma=0.99,
+                lam=0.95,
                  save_path=None, log_dir=None, log=False, args=None):
         super().__init__(env, optimzer, policy, buffer,
                          single_agent_obs, single_agent_action,
                          batch_size=batch_size,
                          num_mini_batches=num_mini_batches,
                          num_agents=num_agents,
+                            ppo_epoch=ppo_epoch,
+                            clip_param=clip_param,
+                            value_loss_coef=value_loss_coef,
+                            entropy_coef=entropy_coef,
+                            max_grad_norm=max_grad_norm,
+                            gamma=gamma,
+                            lam=lam,
                          save_path=save_path, log_dir=log_dir, log=log, args=args)
         
     

@@ -10,6 +10,13 @@ class MAPPO:
             batch_size=128,
             num_mini_batches=4,
             num_agents=4, 
+            ppo_epoch=10,
+            clip_param=0.2,
+            value_loss_coef=0.5,
+            entropy_coef=0.01,
+            max_grad_norm=0.5,
+            gamma=0.99,
+            lam=0.95,
             save_path=None, log_dir=None, log=False, args=None):
         self.env = env
         self.optimizer = optimzer
@@ -23,14 +30,14 @@ class MAPPO:
 
         self.batch_size = batch_size
         self.mini_batch_size = self.batch_size // num_mini_batches
-        self.ppo_epoch = 10
-        self.clip_param = 0.2
-        self.value_loss_coef = 0.5
-        self.entropy_coef = 0.01
-        self.max_grad_norm = 0.5
+        self.ppo_epoch = ppo_epoch  
+        self.clip_param = clip_param
+        self.value_loss_coef = value_loss_coef
+        self.entropy_coef = entropy_coef
+        self.max_grad_norm = max_grad_norm
 
-        self.gamma = 0.99
-        self.lam = 0.95
+        self.gamma = gamma
+        self.lam = lam
 
         self.save_path = save_path
         self.log_dir = log_dir
