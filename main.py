@@ -72,6 +72,7 @@ def main():
             lam=0.95,
     
     """
+    parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
     parser.add_argument('--ppo-epoch', type=int, default=10, help='number of ppo epochs')
     parser.add_argument('--clip-param', type=float, default=0.2, help='ppo clip parameter')
     parser.add_argument('--value-loss-coef', type=float, default=0.5, help='value loss coefficient')
@@ -125,7 +126,7 @@ def main():
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net = Agent(obs_space, action_space, num_agents=args.num_agents).to(device)
-    optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
+    optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
     buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], max_size=args.batch_size)
 
     import os
