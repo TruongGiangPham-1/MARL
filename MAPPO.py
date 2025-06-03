@@ -43,8 +43,11 @@ class MAPPO:
         self.log_dir = log_dir
         self.args = args
 
-        self.summary_writer = SummaryWriter(log_dir=log_dir)
         self.log = log  # whether to log or not
+        if log:
+            self.summary_writer = SummaryWriter(log_dir=log_dir)
+        else:
+            self.summary_writer = None
 
         self.num_gradient_steps = 0
 
@@ -80,10 +83,10 @@ class MAPPO:
         adapt from clearn rl https://github.com/vwxyzjn/cleanrl/blob/master/cleanrl/ppo_pettingzoo_ma_atari.py
 
         Args:
-            rewards (torch.Tensor): shape (num_steps, num_agents)
-            dones (torch.Tensor): shape (num_steps, num_agents)
-            values [V(S_i)]: shape (num_steps, num_agents)
-            next_values (torch.Tensor): shape (1, num_agents)
+            rewards (torch.Tensor): shape (num_steps, num_env*num_agents)
+            dones (torch.Tensor): shape (num_steps, num_env*num_agents)
+            values [V(S_i)]: shape (num_steps, num_env*num_agents)
+            next_values (torch.Tensor): shape (1, num_env*num_agents)
             gamma (float): Discount factor.
             lam (float): Lambda for GAE.
 
@@ -91,15 +94,15 @@ class MAPPO:
             advantages (torch.Tensor): Computed advantages.
         """
         with torch.no_grad():
-            advantages = torch.zeros_like(rewards).to(self.device)  # shape (num_steps, num_agents)
-            lastgaelam  = torch.zeros(self.num_agents).to(self.device)
+            advantages = torch.zeros_like(rewards).to(self.device)  # shape (num_steps, num_env*num_agents)
+            lastgaelam  = torch.zeros(self.args.num_envs*self.num_agents).to(self.device)
             for t in reversed(range(self.buffer.max_size)):
                 if t ==  self.buffer.max_size - 1:
-                    mask = 1.0 - dones[-1]  # shape (num_agents,)
-                    nextvalues = next_values           # shape (1, num_agents)
+                    mask = 1.0 - dones[-1]  # shape (num_env*num_agents,)
+                    nextvalues = next_values           # shape (1, num_env*num_agents)
                 else:
-                    mask = 1.0 - dones[t + 1]    # shape (num_agents,)
-                    nextvalues = values[t + 1]             # shape (num_agents,)
+                    mask = 1.0 - dones[t + 1]    # shape (num_env*num_agents,)
+                    nextvalues = values[t + 1]             # shape (num_env*num_agents,)
                 delta = rewards[t] + self.gamma * nextvalues * mask - values[t]  # A: r_t + \gamma*V(s_t+1) - V(s_t)    shape (num_agents,)
 
                 advantages[t] = lastgaelam = delta + self.gamma * self.lam * mask * lastgaelam  # shape (num_agents,)
@@ -113,12 +116,7 @@ class MAPPO:
         Update the policy using the collected data.
 
         Args:
-            obs (torch.Tensor): Observation tensor. Size (num_agents, obs_dim)
-            actions (torch.Tensor): Action tensor.
-            rewards (torch.Tensor): Reward tensor.
-            dones (torch.Tensor): Done tensor.
-            logprobs (torch.Tensor): Log probability tensor.
-            values (torch.Tensor): Value tensor.
+            next_obs (torch.Tensor): Observation tensor. Size (num_agents*num_env, obs_dim)
         """
         # Implement the update logic here
 
@@ -130,7 +128,7 @@ class MAPPO:
                 next_values = self.policy.get_value(next_obs, joint_obs=joint_obs).to(self.device)
                 assert next_values.shape == (1, 1)
             elif type(self).__name__ == "MAPPO":
-                next_values = self.policy.get_value(next_obs).reshape(1, self.num_agents).to(self.device)
+                next_values = self.policy.get_value(next_obs).reshape(1, self.num_agents*self.args.num_envs).to(self.device)
             else:
                 raise ValueError("Unknown class name. Cannot determine if CMAPPO or MAPPO.")
         advantages = self.compute_gae(

@@ -74,8 +74,6 @@ def make_vector_env(num_envs, overcooked_env):
     num_envs is super misleading variable so dont trust. The source code for ProcConcatVec properly initializes actual number of env
 
     
-    brainstorm
-    before, obs is (num_agents, obs_shape), now is (num_envs*num_agents, obs_shape)
     """
 
     overcooked_env = ss.pettingzoo_env_to_vec_env_v1(overcooked_env)  # Convert the Overcooked environment to a vectorized environment
@@ -129,6 +127,11 @@ def main():
             gamma=0.99,
             lam=0.95,
     
+    num_steps: number of steps per environment before update
+    buffer (num_steps=128, num_envs=8, num_agents=4, obs_shape=(404,), action_shape=(7,), device='cpu')
+    batch_size=num_step*num_env
+    minibatch_size=batch_size/num_minibatches
+    num_update=1,000,000 // batch_size
     """
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
     parser.add_argument('--ppo-epoch', type=int, default=10, help='number of ppo epochs')
@@ -158,11 +161,11 @@ def main():
     assert vec_env.num_envs == args.num_envs*args.num_agents, f"Number of environments {vec_env.num_envs} does not match num_envs*args.num_agents {args.num_envs*args.num_agents}"
     vec_env.reset()
 
-    obs, R, terminated, truncated, info = vec_env.step(
-        np.random.randint(0, vec_env.single_action_space.n, size=(args.num_agents*args.num_envs,))  # random actions for each env
-    )  
-    print(f"reward shape {R.shape}, terminated shape {terminated.shape}, truncated shape {truncated.shape} next_obs shape {obs['n_agent_overcooked_features'].shape}")
-    print(f"obs {obs}, shape is {obs['n_agent_overcooked_features'].shape}")
+    #obs, R, terminated, truncated, info = vec_env.step(
+    #    np.random.randint(0, vec_env.single_action_space.n, size=(args.num_agents*args.num_envs,))  # random actions for each env
+    #)  
+    #print(f"reward shape {R.shape}, terminated shape {terminated.shape}, truncated shape {truncated.shape} next_obs shape {obs['n_agent_overcooked_features'].shape}")
+    #print(f"obs {obs}, shape is {obs['n_agent_overcooked_features'].shape}")
 
     obs_space = vec_env.single_observation_space  # get the observation space
     action_space = vec_env.single_action_space  # get the action space
@@ -171,7 +174,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net = Agent(obs_space, action_space, num_agents=args.num_agents).to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
-    buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], args.num_env, max_size=args.batch_size)
+    buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], args.num_envs, max_size=args.batch_size)
 
     import os
     os.makedirs("logs", exist_ok=True)
@@ -182,19 +185,19 @@ def main():
     sigle_agent_action_dim = env.action_spaces[0].n  # int
     if not args.centralised:
         print(f'Using decentralised critic')
-        ppo_agent = MAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
+        ppo_agent = MAPPO(vec_env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
                           num_mini_batches=args.num_minibatches, ppo_epoch=args.ppo_epoch, clip_param=args.clip_param,
                         value_loss_coef=args.value_loss_coef, entropy_coef=args.entropy_coef, max_grad_norm=args.max_grad_norm,
                         gamma=args.gamma, lam=args.lam,
                         save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log, args=args)
     else:
         print(f'Using centralised critic')
-        ppo_agent = CMAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
+        ppo_agent = CMAPPO(vec_env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
                            num_mini_batches=args.num_minibatches, ppo_epoch=args.ppo_epoch, clip_param=args.clip_param,
                         value_loss_coef=args.value_loss_coef, entropy_coef=args.entropy_coef, max_grad_norm=args.max_grad_norm,
                         gamma=args.gamma, lam=args.lam,
                         save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log, args=args)
-    episode_returns, freq_dict = agent_environment_loop(ppo_agent, env, device, num_update=args.total_steps // args.batch_size, log_dir=log_dir,
+    episode_returns, freq_dict = agent_environment_loop(ppo_agent, vec_env, device, num_update=args.total_steps // args.batch_size, log_dir=log_dir,
                                                         args=args)
     print(f'episode returns {episode_returns}')
     #plot_alg_results(episode_returns, f"results/{args.num_agents}_{args.layout}.png", label="PPO", ylabel="Return")
