@@ -25,6 +25,23 @@ from utils import concat_vec_envs_v1
 
 
 def make_env(num_agents=4, layout="large_overcooked_layout", render_mode="human"):
+    """
+    Normal overcooked envs
+    obs spaces:
+    {0: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
+    1: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
+    2: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
+    3: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32))}
+
+    action spaces:
+    {0: Discrete(7), 1: Discrete(7), 2: Discrete(7), 3: Discrete(7)}
+
+    o, r, t, t, i = env.step()
+
+    r = {agent_id: R for agent_id in N}
+    t = {agent_id: terminated for agent_id in N}
+    t = {agent_id: truncated for agent_id in N}
+    """
     config = N_agent_overcooked_config.copy()  # get config obj
     config["num_agents"] = num_agents
     config["grid"]["layout"] = layout
@@ -46,13 +63,28 @@ def make_env(num_agents=4, layout="large_overcooked_layout", render_mode="human"
 def make_vector_env(num_envs, overcooked_env):
     """
     Create a vectorized environment with the specified number of environments.
+
+    vec_obs: {'n_agent_overcooked_features': Box(-inf, inf, (num_agent*num_env, obshape), float32)}
+    
+    step(actions \in (num_envs*num_agents,)), corresponding
+
+    Note:
+    pettingzoo_env_to_vec_env_v1(overcooked_env)  # sets num_envs to num_agents
+    concat_vec_envs_v1()                          # sets num_envs to num_agents * num_envs
+    num_envs is super misleading variable so dont trust. The source code for ProcConcatVec properly initializes actual number of env
+
+    
+    brainstorm
+    before, obs is (num_agents, obs_shape), now is (num_envs*num_agents, obs_shape)
     """
+
     overcooked_env = ss.pettingzoo_env_to_vec_env_v1(overcooked_env)  # Convert the Overcooked environment to a vectorized environment
     print(f'env.observation_spaces: {overcooked_env.observation_space}')  # Check observation spaces
     print(f'env.action_space: {overcooked_env.action_space}')  # Check action spaces
+    print(f'env_to_vec_env.num_envs: {overcooked_env.num_envs}')  # == num_agents
     envs = concat_vec_envs_v1(
         overcooked_env,
-        num_vec_envs=num_envs // 2,  # if num_envs is 8 actual number of envs is 4
+        num_vec_envs=num_envs,  # if num_envs is 8 actual number of envs is 4
         num_cpus=num_envs,  # Use a single CPU for vectorized environments
         base_class="gymnasium",  # Use gymnasium as the base class
     )
@@ -64,9 +96,6 @@ def make_vector_env(num_envs, overcooked_env):
         'n_agent_overcooked_features'
     ].shape}')  #  (num_envs, obs_shape)
 
-    next_obs, R, terminated, truncated, info = envs.step(
-
-    )
     return envs
 
 
@@ -79,6 +108,7 @@ def main():
         help="Use GPU for training.",
     )
     parser.add_argument('--num-agents', type=int, default=4, help='number of agents')
+    parser.add_argument('--num-envs', type=int, default=8, help='number of env')
     parser.add_argument('--layout', type=str, default='large_overcooked_layout', help='layout')
     parser.add_argument('--save-path', type=str, default=None, help='Path to save the model')
     parser.add_argument('--save', action='store_true', default=False, help='Save the model')
@@ -121,42 +151,27 @@ def main():
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = True
 
+    # ENV stuff ----------
     render_mode = "human" if args.render else None
     env = make_env(args.num_agents, layout=args.layout, render_mode=render_mode)
-    #vec_env = make_vector_env(num_envs=8, overcooked_env=env)  # create vectorized environment with 2 envs
-    env.reset()
+    vec_env = make_vector_env(num_envs=args.num_envs, overcooked_env=env)  # create vectorized environments.
+    assert vec_env.num_envs == args.num_envs*args.num_agents, f"Number of environments {vec_env.num_envs} does not match num_envs*args.num_agents {args.num_envs*args.num_agents}"
+    vec_env.reset()
 
-    obs_space = env.observation_spaces[0]['n_agent_overcooked_features']  # box (-inf, inf, (404,), float32)
-    action_space = env.action_spaces[0]  # Discrete(7)
-    #print(f'env obs {env.observation_spaces[0]["n_agent_overcooked_features"].shape}')  # (404)
-    obs, R, terminated, truncated, info = env.step(
-        {
-            agent_id: env.action_space(agent_id).sample()
-            for agent_id in env.agents
-        }
+    obs, R, terminated, truncated, info = vec_env.step(
+        np.random.randint(0, vec_env.single_action_space.n, size=(args.num_agents*args.num_envs,))  # random actions for each env
     )  
-    print(f'{R}, {terminated}, {truncated}')
-    
-    """
-    obs spaces:
-    {0: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
-    1: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
-    2: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
-    3: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32))}
+    print(f"reward shape {R.shape}, terminated shape {terminated.shape}, truncated shape {truncated.shape} next_obs shape {obs['n_agent_overcooked_features'].shape}")
+    print(f"obs {obs}, shape is {obs['n_agent_overcooked_features'].shape}")
 
-    action spaces:
-    {0: Discrete(7), 1: Discrete(7), 2: Discrete(7), 3: Discrete(7)}
+    obs_space = vec_env.single_observation_space  # get the observation space
+    action_space = vec_env.single_action_space  # get the action space
+    # ----------------------
 
-    o, r, t, t, i = env.step()
-
-    r = {agent_id: R for agent_id in N}
-    t = {agent_id: terminated for agent_id in N}
-    t = {agent_id: truncated for agent_id in N}
-    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net = Agent(obs_space, action_space, num_agents=args.num_agents).to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
-    buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], max_size=args.batch_size)
+    buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], args.num_env, max_size=args.batch_size)
 
     import os
     os.makedirs("logs", exist_ok=True)
