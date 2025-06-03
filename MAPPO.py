@@ -216,8 +216,7 @@ class MAPPO:
         self.num_gradient_steps += 1
 
         if self.save_path is not None and self.num_gradient_steps % 100 == 0:
-            torch.save(self.policy.state_dict(), os.path.join(self.save_path, f"policy_{self.args.num_agents} \
-                                                              _agents_{self.args.layout}_seed_{self.args.seed}.pth"))
+            torch.save(self.policy.state_dict(), os.path.join(self.save_path, f"policy_{self.args.num_agents}_agents_{self.args.layout}_seed_{self.args.seed}.pth"))
             print(f'saved model at {self.save_path}')
         # Reset the buffer
         self.buffer.reset()

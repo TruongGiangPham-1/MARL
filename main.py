@@ -21,6 +21,8 @@ from buffer import Buffer
 from plot import plot_alg_results
 import pandas as pd
 
+from utils import concat_vec_envs_v1
+
 
 def make_env(num_agents=4, layout="large_overcooked_layout", render_mode="human"):
     config = N_agent_overcooked_config.copy()  # get config obj
@@ -40,6 +42,32 @@ def make_env(num_agents=4, layout="large_overcooked_layout", render_mode="human"
         "NAgentOvercooked-V0",
         render_mode=render_mode,
     )
+
+def make_vector_env(num_envs, overcooked_env):
+    """
+    Create a vectorized environment with the specified number of environments.
+    """
+    overcooked_env = ss.pettingzoo_env_to_vec_env_v1(overcooked_env)  # Convert the Overcooked environment to a vectorized environment
+    print(f'env.observation_spaces: {overcooked_env.observation_space}')  # Check observation spaces
+    print(f'env.action_space: {overcooked_env.action_space}')  # Check action spaces
+    envs = concat_vec_envs_v1(
+        overcooked_env,
+        num_vec_envs=num_envs // 2,  # if num_envs is 8 actual number of envs is 4
+        num_cpus=num_envs,  # Use a single CPU for vectorized environments
+        base_class="gymnasium",  # Use gymnasium as the base class
+    )
+    envs.single_observation_space = overcooked_env.observation_space['n_agent_overcooked_features']  # Set the single observation space
+    envs.single_action_space = overcooked_env.action_space  # Set the single action space
+
+    out = envs.reset()
+    print(f'Observation after reset: {out[0][
+        'n_agent_overcooked_features'
+    ].shape}')  #  (num_envs, obs_shape)
+
+    next_obs, R, terminated, truncated, info = envs.step(
+
+    )
+    return envs
 
 
 def main():
@@ -95,6 +123,7 @@ def main():
 
     render_mode = "human" if args.render else None
     env = make_env(args.num_agents, layout=args.layout, render_mode=render_mode)
+    #vec_env = make_vector_env(num_envs=8, overcooked_env=env)  # create vectorized environment with 2 envs
     env.reset()
 
     obs_space = env.observation_spaces[0]['n_agent_overcooked_features']  # box (-inf, inf, (404,), float32)
