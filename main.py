@@ -111,7 +111,8 @@ def main():
     parser.add_argument('--save-path', type=str, default=None, help='Path to save the model')
     parser.add_argument('--save', action='store_true', default=False, help='Save the model')
     parser.add_argument('--total-steps', type=int, default=1000, help='total env steps')
-    parser.add_argument('--batch-size', type=int, default=5, help='number of sample to collect before update')
+    #parser.add_argument('--batch-size', type=int, default=5, help='number of sample to collect before update')
+    parser.add_argument('--num-steps' , type=int, default=128, help='number of steps per environment before update')
     parser.add_argument('--num-minibatches', type=int, default=4, help='')
     parser.add_argument('--log', action='store_true', default=False, help='log the training to tensorboard')
     parser.add_argument('--render', action='store_true', default=False, help='render the env')
@@ -146,7 +147,9 @@ def main():
 
     parser.add_argument('--centralised', action='store_true', default=False, help='False is decentralised, True is centralised')
     args = parser.parse_args()
-    print(f'num_agents: {args.num_agents}, layout: {args.layout}, save_path: {args.save_path}, batch_size: {args.batch_size}')
+    print(f'num_agents: {args.num_agents}, layout: {args.layout}, save_path: {args.save_path}')
+
+    batch_size = args.num_envs * args.num_agents * args.num_steps  # number of samples to collect before update
 
     # TRY NOT TO MODIFY: seeding
     random.seed(args.seed)
@@ -174,7 +177,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net = Agent(obs_space, action_space, num_agents=args.num_agents).to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
-    buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], args.num_envs, max_size=args.batch_size)
+    buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], args.num_envs, max_size=args.num_steps)
 
     import os
     os.makedirs("logs", exist_ok=True)
@@ -185,19 +188,19 @@ def main():
     sigle_agent_action_dim = env.action_spaces[0].n  # int
     if not args.centralised:
         print(f'Using decentralised critic')
-        ppo_agent = MAPPO(vec_env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
+        ppo_agent = MAPPO(vec_env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=batch_size,
                           num_mini_batches=args.num_minibatches, ppo_epoch=args.ppo_epoch, clip_param=args.clip_param,
                         value_loss_coef=args.value_loss_coef, entropy_coef=args.entropy_coef, max_grad_norm=args.max_grad_norm,
                         gamma=args.gamma, lam=args.lam,
                         save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log, args=args)
     else:
         print(f'Using centralised critic')
-        ppo_agent = CMAPPO(vec_env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
+        ppo_agent = CMAPPO(vec_env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=batch_size,
                            num_mini_batches=args.num_minibatches, ppo_epoch=args.ppo_epoch, clip_param=args.clip_param,
                         value_loss_coef=args.value_loss_coef, entropy_coef=args.entropy_coef, max_grad_norm=args.max_grad_norm,
                         gamma=args.gamma, lam=args.lam,
                         save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log, args=args)
-    episode_returns, freq_dict = agent_environment_loop(ppo_agent, vec_env, device, num_update=args.total_steps // args.batch_size, log_dir=log_dir,
+    episode_returns, freq_dict = agent_environment_loop(ppo_agent, vec_env, device, num_update=args.total_steps // batch_size, log_dir=log_dir,
                                                         args=args)
     print(f'episode returns {episode_returns}')
     #plot_alg_results(episode_returns, f"results/{args.num_agents}_{args.layout}.png", label="PPO", ylabel="Return")

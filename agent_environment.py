@@ -14,7 +14,7 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None, ar
     agent: mappo agent
     """
     summary_writer = SummaryWriter(log_dir=log_dir)
-    collect_steps = agent.batch_size
+    collect_steps = args.num_steps
 
     # TODO: move this to replay buffer
     episodes_reward = []
