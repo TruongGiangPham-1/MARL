@@ -104,7 +104,7 @@ N_agent_overcooked_config = {
     # which could generate a layout dynamically.
     "grid": {"layout": "large_overcooked_layout"},
     # Number of steps per episode.
-    "max_steps": 400,
+    "max_steps": 1000,
     #"num_agents": 4,
 }
 

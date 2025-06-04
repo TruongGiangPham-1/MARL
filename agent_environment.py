@@ -63,17 +63,17 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None, ar
             rewards = torch.FloatTensor(rewards).to(device)
 
             # if there is 1 in rewards tensor, print hello
-            if torch.any(rewards >= 1):
+            if torch.any(rewards[0:2] >= 1):
                 frequency_delivery_per_episode += 1
                 print(f'global_step {global_step} agent sucessfully delievered. rewards {rewards}')
-            if torch.any(rewards == 0.3):
+            if torch.any(rewards[0:2] == 0.3):
                 frequency_plated_per_episode += 1
-            if torch.any(rewards == 0.1):
+            if torch.any(rewards[0:2] == 0.1):
                 frequency_ingredient_in_pot_per_episode += 1
 
             
             # sum of reward
-            episode_reward +=  rewards.float().mean().item()  # mean reward for the episode
+            episode_reward +=  rewards[0:2].float().mean().item()  # mean reward for the episode
      
 
             #if rewards.float().mean().item() > 0:
@@ -82,7 +82,7 @@ def agent_environment_loop(agent, env, device, num_update=1000, log_dir=None, ar
 
             agent.add_to_buffer(obs, actions, rewards, dones, logprobs, values.squeeze(1))
 
-            if torch.all(dones):
+            if torch.all(dones[0:2]):
                 # handle reset 
                 next_obs, info = env.reset()
                 episodes_reward.append(episode_reward)
