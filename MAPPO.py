@@ -124,7 +124,7 @@ class MAPPO:
         with torch.no_grad():
             if type(self).__name__ == "CMAPPO":
                 # convert next_obs to joint_obs. next_obs dim (num_agents, obs_dim) to (1, num_agents * obs_dim)
-                joint_obs = next_obs.view(1, -1)  # dim (1, num_agents * obs_dim)
+                joint_obs = next_obs.view(1, -1)  # dim (1, num*env*num_agents * obs_dim)
                 next_values = self.policy.get_value(next_obs, joint_obs=joint_obs).to(self.device)
                 assert next_values.shape == (1, 1)
             elif type(self).__name__ == "MAPPO":
@@ -173,7 +173,7 @@ class MAPPO:
                 """
                 logratio = newlogprob - b_logprobs[mb_inds]
 
-                ratio = logratio.exp()  # dim (mini_batch_size, num_env*num_agents)
+                ratio = logratio.exp()  # dim (mini_batch_size, num_env*num_agents*num_steps)
 
                 with torch.no_grad():
                     old_approx_kl = (-logratio).mean()    # k1 approxiatino
@@ -183,18 +183,18 @@ class MAPPO:
                     )
 
                 mb_advantages = b_advantages[mb_inds]  # dim (mini_batchLower variance than plain_size, num_agents)
-                mb_value_targets = b_value_target[mb_inds]  # dim (mini_batch_size, num_env*num_agents)
+                mb_value_targets = b_value_target[mb_inds]  # dim (mini_batch_size, num_env*num_agents*num_steps)
 
 
                 # policy loss
-                pg_loss1 = -mb_advantages * ratio  # dim (minibatch, num_env*num_agent)
+                pg_loss1 = -mb_advantages * ratio  # dim (minibatch, num_env*num_agent*num_steps)
                 pg_loss2 = -mb_advantages * torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param)
                 pg_loss = torch.max(pg_loss1, pg_loss2).mean()
 
                 # value loss (no clipping TODO: clip)
-                newvalue = newvalue.squeeze()  # dim (minibatch_size, num_env*num_agents)
+                newvalue = newvalue.squeeze()  # dim (minibatch_size, num_env*num_agents*num_steps)
 
-                v_loss = self.compute_value_loss(mb_value_targets, newvalue)  # dim (mini_batch_size, num_env*num_agents)
+                v_loss = self.compute_value_loss(mb_value_targets, newvalue)  # dim (mini_batch_size, num_env*num_agents*num_steps)
 
 
                 entropy_loss = entropy.mean()  # dim (1)

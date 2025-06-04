@@ -65,7 +65,7 @@ class CMAPPO(MAPPO):
         """
         with torch.no_grad():
             advantages = torch.zeros_like(rewards).to(self.device)  # shape (num_steps, num_agents)
-            lastgaelam  = torch.zeros(self.num_agents).to(self.device)
+            lastgaelam  = torch.zeros(self.num_agents* self.args.num_envs).to(self.device)
             for t in reversed(range(self.buffer.max_size)):
                 if t ==  self.buffer.max_size - 1:
                     mask = 1.0 - dones[-1]  # shape (num_agents,)
