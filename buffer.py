@@ -1,19 +1,19 @@
 import numpy as np
 import torch
 class Buffer(object):
-    def __init__(self, state_dim, num_agents, max_size=128, centralized=False):
+    def __init__(self, state_dim, num_agents, num_env, max_size=128, centralized=False):
         self.max_size = max_size
         self.ptr = 0
         self.size = 0
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.obs_buff = torch.zeros((max_size, num_agents, state_dim)).to(self.device)
-        self.actions_buff = torch.zeros((max_size, num_agents)).to(self.device)
-        self.rewards_buff = torch.zeros((max_size, num_agents)).to(self.device)
-        self.dones_buff = torch.zeros((max_size, num_agents)).to(self.device)
-        self.logprobs_buff = torch.zeros((max_size, num_agents)).to(self.device)
-        self.values_buff = torch.zeros((max_size, num_agents)).to(self.device)
+        self.obs_buff = torch.zeros((max_size, num_env*num_agents, state_dim)).to(self.device)
+        self.actions_buff = torch.zeros((max_size, num_env*num_agents)).to(self.device)
+        self.rewards_buff = torch.zeros((max_size, num_env*num_agents)).to(self.device)
+        self.dones_buff = torch.zeros((max_size, num_env*num_agents)).to(self.device)
+        self.logprobs_buff = torch.zeros((max_size, num_env*num_agents)).to(self.device)
+        self.values_buff = torch.zeros((max_size, num_env*num_agents)).to(self.device)
         if centralized:
             self.values_buff = torch.zeros((max_size, 1)).to(self.device)
         print(f'buffer sizes {self.obs_buff.shape}, {self.actions_buff.shape}, {self.rewards_buff.shape}, {self.dones_buff.shape}, {self.logprobs_buff.shape}, {self.values_buff.shape}')

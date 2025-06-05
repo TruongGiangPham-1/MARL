@@ -3,11 +3,13 @@ import numpy as np
 import os
 from torch.utils.tensorboard import SummaryWriter
 
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
 class MAPPO:
 
     def __init__(self, env, optimzer, policy, buffer,
             single_agent_obs, single_agent_action,
-            batch_size=128,
+            batch_size=1,
             num_mini_batches=4,
             num_agents=4, 
             ppo_epoch=10,
@@ -43,8 +45,11 @@ class MAPPO:
         self.log_dir = log_dir
         self.args = args
 
-        self.summary_writer = SummaryWriter(log_dir=log_dir)
         self.log = log  # whether to log or not
+        if log:
+            self.summary_writer = SummaryWriter(log_dir=log_dir)
+        else:
+            self.summary_writer = None
 
         self.num_gradient_steps = 0
 
@@ -80,10 +85,10 @@ class MAPPO:
         adapt from clearn rl https://github.com/vwxyzjn/cleanrl/blob/master/cleanrl/ppo_pettingzoo_ma_atari.py
 
         Args:
-            rewards (torch.Tensor): shape (num_steps, num_agents)
-            dones (torch.Tensor): shape (num_steps, num_agents)
-            values [V(S_i)]: shape (num_steps, num_agents)
-            next_values (torch.Tensor): shape (1, num_agents)
+            rewards (torch.Tensor): shape (num_steps, num_env*num_agents)
+            dones (torch.Tensor): shape (num_steps, num_env*num_agents)
+            values [V(S_i)]: shape (num_steps, num_env*num_agents)
+            next_values (torch.Tensor): shape (1, num_env*num_agents)
             gamma (float): Discount factor.
             lam (float): Lambda for GAE.
 
@@ -91,15 +96,15 @@ class MAPPO:
             advantages (torch.Tensor): Computed advantages.
         """
         with torch.no_grad():
-            advantages = torch.zeros_like(rewards).to(self.device)  # shape (num_steps, num_agents)
-            lastgaelam  = torch.zeros(self.num_agents).to(self.device)
+            advantages = torch.zeros_like(rewards).to(self.device)  # shape (num_steps, num_env*num_agents)
+            lastgaelam  = torch.zeros(self.args.num_envs*self.num_agents).to(self.device)
             for t in reversed(range(self.buffer.max_size)):
                 if t ==  self.buffer.max_size - 1:
-                    mask = 1.0 - dones[-1]  # shape (num_agents,)
-                    nextvalues = next_values           # shape (1, num_agents)
+                    mask = 1.0 - dones[-1]  # shape (num_env*num_agents,)
+                    nextvalues = next_values           # shape (1, num_env*num_agents)
                 else:
-                    mask = 1.0 - dones[t + 1]    # shape (num_agents,)
-                    nextvalues = values[t + 1]             # shape (num_agents,)
+                    mask = 1.0 - dones[t + 1]    # shape (num_env*num_agents,)
+                    nextvalues = values[t + 1]             # shape (num_env*num_agents,)
                 delta = rewards[t] + self.gamma * nextvalues * mask - values[t]  # A: r_t + \gamma*V(s_t+1) - V(s_t)    shape (num_agents,)
 
                 advantages[t] = lastgaelam = delta + self.gamma * self.lam * mask * lastgaelam  # shape (num_agents,)
@@ -113,12 +118,7 @@ class MAPPO:
         Update the policy using the collected data.
 
         Args:
-            obs (torch.Tensor): Observation tensor. Size (num_agents, obs_dim)
-            actions (torch.Tensor): Action tensor.
-            rewards (torch.Tensor): Reward tensor.
-            dones (torch.Tensor): Done tensor.
-            logprobs (torch.Tensor): Log probability tensor.
-            values (torch.Tensor): Value tensor.
+            next_obs (torch.Tensor): Observation tensor. Size (num_agents*num_env, obs_dim)
         """
         # Implement the update logic here
 
@@ -126,11 +126,11 @@ class MAPPO:
         with torch.no_grad():
             if type(self).__name__ == "CMAPPO":
                 # convert next_obs to joint_obs. next_obs dim (num_agents, obs_dim) to (1, num_agents * obs_dim)
-                joint_obs = next_obs.view(1, -1)  # dim (1, num_agents * obs_dim)
+                joint_obs = next_obs.view(1, -1)  # dim (1, num*env*num_agents * obs_dim)
                 next_values = self.policy.get_value(next_obs, joint_obs=joint_obs).to(self.device)
                 assert next_values.shape == (1, 1)
             elif type(self).__name__ == "MAPPO":
-                next_values = self.policy.get_value(next_obs).reshape(1, self.num_agents).to(self.device)
+                next_values = self.policy.get_value(next_obs).reshape(1, self.num_agents*self.args.num_envs).to(self.device)
             else:
                 raise ValueError("Unknown class name. Cannot determine if CMAPPO or MAPPO.")
         advantages = self.compute_gae(
@@ -138,12 +138,21 @@ class MAPPO:
             self.buffer.dones_buff,
             self.buffer.values_buff,
             next_values=next_values
-        )  # dim (num_steps, num_agents)
+        )  # dim (num_steps, num_env*num_agents)
 
         # A + V = r_t + \gamma*V(s_t+1) - V(s_t) + V(s_t) = r_t + \gamma*V(s_t+1) = TD target estimate for V(s_t)
-        value_target = advantages + self.buffer.values_buff  
-      
-        b_inds = np.arange(self.batch_size)
+        value_target = advantages + self.buffer.values_buff  # dim (num_steps, num_env*num_agents)
+
+        # flatten the buffer
+        b_obs = self.buffer.obs_buff.reshape((-1, ) + self.env.single_observation_space.shape)  # (num_steps * num_env * num_agents, obs_dim)
+        b_logprobs = self.buffer.logprobs_buff.reshape(-1)                                      # dim (num_steps * num_env * num_agents, )
+        b_actions = self.buffer.actions_buff.reshape((-1, )  + self.env.single_action_space.shape)  # dim (num_steps * num_env * num_agents, action_dim)
+        b_advantages = advantages.reshape(-1)  # dim (num_steps * num_env * num_agents, )        
+        b_value_target = value_target.reshape(-1)  # dim (num_steps * num_env * num_agents, )
+        b_values = self.buffer.values_buff.reshape(-1)  # dim (num_steps * num_env * num_agents, )
+
+        assert self.batch_size == self.args.num_envs * self.num_agents * self.args.num_steps  # total number of samples
+        b_inds = np.arange(self.batch_size)  # batch size is num_steps * num_env * num_agents
         clipfracs = []
         for _ in range(self.ppo_epoch):
             # Sample a batch of data from the buffer
@@ -155,19 +164,18 @@ class MAPPO:
                     end = self.batch_size
 
                 mb_inds = b_inds[start:end]             # dim (mini_batch_size,)
-                mb_obs = self.buffer.obs_buff[mb_inds]  # dim (minibatch, num_agents, obs_dim)
-                mb_actions = self.buffer.actions_buff.long()[mb_inds]
+                mb_obs = b_obs[mb_inds]  # dim (mini)
+                mb_actions = b_actions.long()[mb_inds]
                 
-
                 _, newlogprob, entropy, newvalue = self.policy.get_action_and_value(mb_obs, mb_actions)
                 """
                 newlogprob shape (minibatch_size, num_agent)
                 entropy shape (minibatch_size, num_agent)
                 newvalue shape (minibatch_size, num_agent, 1)
                 """
-                logratio = newlogprob - self.buffer.logprobs_buff[mb_inds]
+                logratio = newlogprob - b_logprobs[mb_inds]
 
-                ratio = logratio.exp()  # dim (mini_batch_size, num_agents)
+                ratio = logratio.exp()  # dim (mini_batch_size, num_env*num_agents*num_steps)
 
                 with torch.no_grad():
                     old_approx_kl = (-logratio).mean()    # k1 approxiatino
@@ -176,19 +184,19 @@ class MAPPO:
                         ((ratio - 1.0).abs() > self.clip_param).float().mean().item()
                     )
 
-                mb_advantages = advantages[mb_inds]  # dim (mini_batchLower variance than plain_size, num_agents)
-                mb_value_targets = value_target[mb_inds]  # dim (mini_batch_size, num_agents)
+                mb_advantages = b_advantages[mb_inds]  # dim (mini_batchLower variance than plain_size, num_agents)
+                mb_value_targets = b_value_target[mb_inds]  # dim (mini_batch_size, num_env*num_agents*num_steps)
 
 
                 # policy loss
-                pg_loss1 = -mb_advantages * ratio  # dim (minibatch, num_agent)
+                pg_loss1 = -mb_advantages * ratio  # dim (minibatch, num_env*num_agent*num_steps)
                 pg_loss2 = -mb_advantages * torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param)
                 pg_loss = torch.max(pg_loss1, pg_loss2).mean()
 
                 # value loss (no clipping TODO: clip)
-                newvalue = newvalue.squeeze()  # dim (minibatch_size, num_agents)
+                newvalue = newvalue.squeeze()  # dim (minibatch_size, num_env*num_agents*num_steps)
 
-                v_loss = self.compute_value_loss(mb_value_targets, newvalue)  # dim (mini_batch_size, num_agents)
+                v_loss = self.compute_value_loss(mb_value_targets, newvalue)  # dim (mini_batch_size, num_env*num_agents*num_steps)
 
 
                 entropy_loss = entropy.mean()  # dim (1)
@@ -216,7 +224,10 @@ class MAPPO:
         self.num_gradient_steps += 1
 
         if self.save_path is not None and self.num_gradient_steps % 100 == 0:
-            torch.save(self.policy.state_dict(), os.path.join(self.save_path, f"policy_{self.args.num_agents}_agents_{self.args.layout}_seed_{self.args.seed}.pth"))
+            bool_to_str = lambda x: "centralised" if x else "decentralised"
+            final_path = os.path.join(PROJECT_ROOT, self.save_path, f"{bool_to_str(self.args.centralised)}_policy_{self.args.num_agents}_agents_{self.args.layout}_seed_{self.args.seed}.pth")
+
+            torch.save(self.policy.state_dict(), final_path)
             print(f'saved model at {self.save_path}')
         # Reset the buffer
         self.buffer.reset()
