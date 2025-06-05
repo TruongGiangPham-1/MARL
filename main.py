@@ -22,7 +22,10 @@ from plot import plot_alg_results
 import pandas as pd
 
 from utils import concat_vec_envs_v1
+import os
 
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+print(f'PROJECT_ROOT: {PROJECT_ROOT}')
 
 def make_env(num_agents=4, layout="large_overcooked_layout", render_mode="human"):
     """
@@ -109,6 +112,7 @@ def main():
     parser.add_argument('--num-envs', type=int, default=8, help='number of env')
     parser.add_argument('--layout', type=str, default='large_overcooked_layout', help='layout')
     parser.add_argument('--save-path', type=str, default=None, help='Path to save the model')
+    parser.add_argument('--data-path', type=str, default='data', help='Path to save the csv files for plotting')
     parser.add_argument('--save', action='store_true', default=False, help='Save the model')
     parser.add_argument('--total-steps', type=int, default=1000, help='total env steps')
     #parser.add_argument('--batch-size', type=int, default=5, help='number of sample to collect before update')
@@ -181,7 +185,7 @@ def main():
 
     import os
     os.makedirs("logs", exist_ok=True)
-    os.makedirs("data", exist_ok=True)  # contain .csv files of returns
+    os.makedirs(os.path.join(PROJECT_ROOT, args.data_path), exist_ok=True)  # contain .csv files of returns
     log_dir = f"logs/run__{int(time.time())}"
 
     single_agent_obs_dim = env.observation_spaces[0]['n_agent_overcooked_features'].shape  # 
@@ -203,19 +207,24 @@ def main():
     episode_returns, freq_dict = agent_environment_loop(ppo_agent, vec_env, device, num_update=args.total_steps // batch_size, log_dir=log_dir,
                                                         args=args)
     print(f'episode returns {episode_returns}')
-    #plot_alg_results(episode_returns, f"results/{args.num_agents}_{args.layout}.png", label="PPO", ylabel="Return")
+
+    bool_to_str = lambda x: "centralised" if x else "decentralised"
+    folder_path = os.path.join(PROJECT_ROOT, args.data_path)
+
     df = pd.DataFrame(episode_returns)
-    df.to_csv(f'data/{args.num_agents}_{args.layout}_returns_seed_{args.seed}.csv', index=False)
+    df.to_csv(os.path.join(folder_path, f'{bool_to_str(args.centralised)}_{args.num_agents}_{args.layout}_returns_seed_{args.seed}.csv'), index=False)
 
     df = pd.DataFrame(freq_dict["frequency_delivery_per_episode"])
-    df.to_csv(f'data/{args.num_agents}_{args.layout}_frequency_delivery_per_episode_seed_{args.seed}.csv', index=False)
+    df.to_csv(os.path.join(folder_path, f'{bool_to_str(args.centralised)}_{args.num_agents}_{args.layout}_frequency_delivery_per_episode_seed_{args.seed}.csv'), index=False)
+
     df = pd.DataFrame(freq_dict["frequency_plated_per_episode"])
-    df.to_csv(f'data/{args.num_agents}_{args.layout}_frequency_plated_per_episode_seed_{args.seed}.csv', index=False)
+    df.to_csv(os.path.join(folder_path, f'{bool_to_str(args.centralised)}_{args.num_agents}_{args.layout}_frequency_plated_per_episode_seed_{args.seed}.csv'), index=False)
+
     df = pd.DataFrame(freq_dict["frequency_ingredient_in_pot_per_episode"])
-    df.to_csv(f'data/{args.num_agents}_{args.layout}_frequency_ingredient_in_pot_per_episode_seed_{args.seed}.csv', index=False)
+    df.to_csv(os.path.join(folder_path, f'{bool_to_str(args.centralised)}_{args.num_agents}_{args.layout}_frequency_ingredient_in_pot_per_episode_seed_{args.seed}.csv'), index=False)
 
     # save args to file
-    with open(f'data/{args.num_agents}_{args.layout}_args_seed_{args.seed}.txt', 'w') as f:
+    with open(os.path.join(folder_path, f'{bool_to_str(args.centralised)}_{args.num_agents}_{args.layout}_args_seed_{args.seed}.txt'), 'w') as f:
         for arg in vars(args):
             f.write(f"{arg}: {getattr(args, arg)}\n")
     return

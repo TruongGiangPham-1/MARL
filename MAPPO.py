@@ -3,6 +3,8 @@ import numpy as np
 import os
 from torch.utils.tensorboard import SummaryWriter
 
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
 class MAPPO:
 
     def __init__(self, env, optimzer, policy, buffer,
@@ -222,7 +224,10 @@ class MAPPO:
         self.num_gradient_steps += 1
 
         if self.save_path is not None and self.num_gradient_steps % 100 == 0:
-            torch.save(self.policy.state_dict(), os.path.join(self.save_path, f"policy_{self.args.num_agents}_agents_{self.args.layout}_seed_{self.args.seed}.pth"))
+            bool_to_str = lambda x: "centralised" if x else "decentralised"
+            final_path = os.path.join(PROJECT_ROOT, self.save_path, f"{bool_to_str(self.args.centralised)}_policy_{self.args.num_agents}_agents_{self.args.layout}_seed_{self.args.seed}.pth")
+
+            torch.save(self.policy.state_dict(), final_path)
             print(f'saved model at {self.save_path}')
         # Reset the buffer
         self.buffer.reset()
