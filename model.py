@@ -3,10 +3,10 @@ import torch.nn as nn
 import numpy as np
 from torch.distributions.categorical import Categorical
 
-#def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
-#    torch.nn.init.orthogonal_(layer.weight, std)
-#    torch.nn.init.constant_(layer.bias, bias_const)
-#    return layer
+def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
+    torch.nn.init.orthogonal_(layer.weight, std)
+    torch.nn.init.constant_(layer.bias, bias_const)
+    return layer
 
 class Agent(nn.Module):
     # from clearn RL https://github.com/vwxyzjn/cleanrl/blob/master/cleanrl/ppo_pettingzoo_ma_atari.py
@@ -17,20 +17,20 @@ class Agent(nn.Module):
         self.num_agents = num_agents
         self.num_envs = num_envs
         self.network = nn.Sequential(
-            nn.Linear(obs_space.shape[0], 512),  # Adjust for 1D input
+            layer_init(nn.Linear(obs_space.shape[0], 512)),  # Adjust for 1D input
             nn.ReLU(),
-            nn.Linear(512, 256),
+            layer_init(nn.Linear(512, 256)),
             nn.ReLU(),
         )
-        self.actor = nn.Linear(256, action_space.n)
-        self.critic = nn.Linear(256, 1)  # decentralized critic for each agent
+        self.actor = layer_init(nn.Linear(256, action_space.n))
+        self.critic = layer_init(nn.Linear(256, 1))  # decentralized critic for each agent
 
         self.centralised_critics = nn.Sequential(
-            nn.Linear(obs_space.shape[0]* num_agents*num_envs, 512),
+            layer_init(nn.Linear(obs_space.shape[0]* num_agents*num_envs, 512)),
             nn.ReLU(),
-            nn.Linear(512, 256),
+            layer_init(nn.Linear(512, 256)),
             nn.ReLU(),
-            nn.Linear(256, 1)
+            layer_init(nn.Linear(256, 1))
         )
 
     """

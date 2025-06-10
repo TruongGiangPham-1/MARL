@@ -180,7 +180,7 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net = Agent(obs_space, action_space, num_agents=args.num_agents, num_envs=args.num_envs).to(device)
-    optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(net.parameters(), lr=args.lr, betas=(0.9, 0.95))
     buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], args.num_envs, max_size=args.num_steps)
 
     import os

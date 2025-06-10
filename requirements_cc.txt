@@ -1,7 +1,7 @@
 torch
 numpy
 tqdm
-cogridA    # uses numpy < 2
+cogrid    # uses numpy < 2
 pygame
 supersuit
 categorical
