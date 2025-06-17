@@ -69,9 +69,9 @@ def plot_ingredients_in_pots(episode_returns_list, file, label="Algorithm", ylab
     print(len(episode_returns_list))
     running_avg = np.mean(np.array(episode_returns_list), axis=0)  # Average over seeds. dim (1, num_episodes)
     new_running_avg = running_avg.copy()
-    #for i in range(len(running_avg)):
-    #    new_running_avg[i] = np.mean(running_avg[max(0, i-10):min(len(running_avg), i + 10)])  # each point is the average of itself and its neighbors (+/- 10*eval_interval)
-    #running_avg = new_running_avg
+    for i in range(len(running_avg)):
+        new_running_avg[i] = np.mean(running_avg[max(0, i-10):min(len(running_avg), i + 10)])  # each point is the average of itself and its neighbors (+/- 10*eval_interval)
+    running_avg = new_running_avg
 
     # x axis goes by 1000
     eval_interval = 1

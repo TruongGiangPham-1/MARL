@@ -22,9 +22,29 @@ from plot import plot_alg_results
 import pandas as pd
 
 from utils import concat_vec_envs_v1
+import os
 
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+print(f'PROJECT_ROOT: {PROJECT_ROOT}')
 
 def make_env(num_agents=4, layout="large_overcooked_layout", render_mode="human"):
+    """
+    Normal overcooked envs
+    obs spaces:
+    {0: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
+    1: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
+    2: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
+    3: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32))}
+
+    action spaces:
+    {0: Discrete(7), 1: Discrete(7), 2: Discrete(7), 3: Discrete(7)}
+
+    o, r, t, t, i = env.step()
+
+    r = {agent_id: R for agent_id in N}
+    t = {agent_id: terminated for agent_id in N}
+    t = {agent_id: truncated for agent_id in N}
+    """
     config = N_agent_overcooked_config.copy()  # get config obj
     config["num_agents"] = num_agents
     config["grid"]["layout"] = layout
@@ -46,13 +66,26 @@ def make_env(num_agents=4, layout="large_overcooked_layout", render_mode="human"
 def make_vector_env(num_envs, overcooked_env):
     """
     Create a vectorized environment with the specified number of environments.
+
+    vec_obs: {'n_agent_overcooked_features': Box(-inf, inf, (num_agent*num_env, obshape), float32)}
+    
+    step(actions \in (num_envs*num_agents,)), corresponding
+
+    Note:
+    pettingzoo_env_to_vec_env_v1(overcooked_env)  # sets num_envs to num_agents
+    concat_vec_envs_v1()                          # sets num_envs to num_agents * num_envs
+    num_envs is super misleading variable so dont trust. The source code for ProcConcatVec properly initializes actual number of env
+
+    
     """
+
     overcooked_env = ss.pettingzoo_env_to_vec_env_v1(overcooked_env)  # Convert the Overcooked environment to a vectorized environment
     print(f'env.observation_spaces: {overcooked_env.observation_space}')  # Check observation spaces
     print(f'env.action_space: {overcooked_env.action_space}')  # Check action spaces
+    print(f'env_to_vec_env.num_envs: {overcooked_env.num_envs}')  # == num_agents
     envs = concat_vec_envs_v1(
         overcooked_env,
-        num_vec_envs=num_envs // 2,  # if num_envs is 8 actual number of envs is 4
+        num_vec_envs=num_envs,  # if num_envs is 8 actual number of envs is 4
         num_cpus=num_envs,  # Use a single CPU for vectorized environments
         base_class="gymnasium",  # Use gymnasium as the base class
     )
@@ -64,9 +97,6 @@ def make_vector_env(num_envs, overcooked_env):
         'n_agent_overcooked_features'
     ].shape}')  #  (num_envs, obs_shape)
 
-    next_obs, R, terminated, truncated, info = envs.step(
-
-    )
     return envs
 
 
@@ -79,11 +109,14 @@ def main():
         help="Use GPU for training.",
     )
     parser.add_argument('--num-agents', type=int, default=4, help='number of agents')
+    parser.add_argument('--num-envs', type=int, default=8, help='number of env')
     parser.add_argument('--layout', type=str, default='large_overcooked_layout', help='layout')
     parser.add_argument('--save-path', type=str, default=None, help='Path to save the model')
+    parser.add_argument('--data-path', type=str, default='data', help='Path to save the csv files for plotting')
     parser.add_argument('--save', action='store_true', default=False, help='Save the model')
     parser.add_argument('--total-steps', type=int, default=1000, help='total env steps')
-    parser.add_argument('--batch-size', type=int, default=5, help='number of sample to collect before update')
+    #parser.add_argument('--batch-size', type=int, default=5, help='number of sample to collect before update')
+    parser.add_argument('--num-steps' , type=int, default=128, help='number of steps per environment before update')
     parser.add_argument('--num-minibatches', type=int, default=4, help='')
     parser.add_argument('--log', action='store_true', default=False, help='log the training to tensorboard')
     parser.add_argument('--render', action='store_true', default=False, help='render the env')
@@ -99,6 +132,11 @@ def main():
             gamma=0.99,
             lam=0.95,
     
+    num_steps: number of steps per environment before update
+    buffer (num_steps=128, num_envs=8, num_agents=4, obs_shape=(404,), action_shape=(7,), device='cpu')
+    batch_size=num_step*num_env
+    minibatch_size=batch_size/num_minibatches
+    num_update=1,000,000 // batch_size
     """
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
     parser.add_argument('--ppo-epoch', type=int, default=10, help='number of ppo epochs')
@@ -113,7 +151,9 @@ def main():
 
     parser.add_argument('--centralised', action='store_true', default=False, help='False is decentralised, True is centralised')
     args = parser.parse_args()
-    print(f'num_agents: {args.num_agents}, layout: {args.layout}, save_path: {args.save_path}, batch_size: {args.batch_size}')
+    print(f'num_agents: {args.num_agents}, layout: {args.layout}, save_path: {args.save_path}')
+
+    batch_size = args.num_envs * args.num_agents * args.num_steps  # number of samples to collect before update
 
     # TRY NOT TO MODIFY: seeding
     random.seed(args.seed)
@@ -121,80 +161,70 @@ def main():
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = True
 
+    # ENV stuff ----------
     render_mode = "human" if args.render else None
     env = make_env(args.num_agents, layout=args.layout, render_mode=render_mode)
-    #vec_env = make_vector_env(num_envs=8, overcooked_env=env)  # create vectorized environment with 2 envs
-    env.reset()
+    vec_env = make_vector_env(num_envs=args.num_envs, overcooked_env=env)  # create vectorized environments.
+    assert vec_env.num_envs == args.num_envs*args.num_agents, f"Number of environments {vec_env.num_envs} does not match num_envs*args.num_agents {args.num_envs*args.num_agents}"
+    vec_env.reset()
 
-    obs_space = env.observation_spaces[0]['n_agent_overcooked_features']  # box (-inf, inf, (404,), float32)
-    action_space = env.action_spaces[0]  # Discrete(7)
-    #print(f'env obs {env.observation_spaces[0]["n_agent_overcooked_features"].shape}')  # (404)
-    obs, R, terminated, truncated, info = env.step(
-        {
-            agent_id: env.action_space(agent_id).sample()
-            for agent_id in env.agents
-        }
-    )  
-    print(f'{R}, {terminated}, {truncated}')
-    
-    """
-    obs spaces:
-    {0: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
-    1: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
-    2: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32)), 
-    3: Dict('n_agent_overcooked_features': Box(-inf, inf, (404,), float32))}
+    #obs, R, terminated, truncated, info = vec_env.step(
+    #    np.random.randint(0, vec_env.single_action_space.n, size=(args.num_agents*args.num_envs,))  # random actions for each env
+    #)  
+    #print(f"reward shape {R.shape}, terminated shape {terminated.shape}, truncated shape {truncated.shape} next_obs shape {obs['n_agent_overcooked_features'].shape}")
+    #print(f"obs {obs}, shape is {obs['n_agent_overcooked_features'].shape}")
 
-    action spaces:
-    {0: Discrete(7), 1: Discrete(7), 2: Discrete(7), 3: Discrete(7)}
+    obs_space = vec_env.single_observation_space  # get the observation space
+    action_space = vec_env.single_action_space  # get the action space
+    # ----------------------
 
-    o, r, t, t, i = env.step()
-
-    r = {agent_id: R for agent_id in N}
-    t = {agent_id: terminated for agent_id in N}
-    t = {agent_id: truncated for agent_id in N}
-    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    net = Agent(obs_space, action_space, num_agents=args.num_agents).to(device)
-    optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
-    buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], max_size=args.batch_size)
+    net = Agent(obs_space, action_space, num_agents=args.num_agents, num_envs=args.num_envs).to(device)
+    optimizer = torch.optim.Adam(net.parameters(), lr=args.lr, betas=(0.9, 0.95))
+    buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], args.num_envs, max_size=args.num_steps)
 
     import os
     os.makedirs("logs", exist_ok=True)
-    os.makedirs("data", exist_ok=True)  # contain .csv files of returns
+    os.makedirs(os.path.join(PROJECT_ROOT, args.data_path), exist_ok=True)  # contain .csv files of returns
     log_dir = f"logs/run__{int(time.time())}"
 
     single_agent_obs_dim = env.observation_spaces[0]['n_agent_overcooked_features'].shape  # 
     sigle_agent_action_dim = env.action_spaces[0].n  # int
     if not args.centralised:
         print(f'Using decentralised critic')
-        ppo_agent = MAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
+        ppo_agent = MAPPO(vec_env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=batch_size,
                           num_mini_batches=args.num_minibatches, ppo_epoch=args.ppo_epoch, clip_param=args.clip_param,
                         value_loss_coef=args.value_loss_coef, entropy_coef=args.entropy_coef, max_grad_norm=args.max_grad_norm,
                         gamma=args.gamma, lam=args.lam,
                         save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log, args=args)
     else:
         print(f'Using centralised critic')
-        ppo_agent = CMAPPO(env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=args.batch_size, 
+        ppo_agent = CMAPPO(vec_env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=batch_size,
                            num_mini_batches=args.num_minibatches, ppo_epoch=args.ppo_epoch, clip_param=args.clip_param,
                         value_loss_coef=args.value_loss_coef, entropy_coef=args.entropy_coef, max_grad_norm=args.max_grad_norm,
                         gamma=args.gamma, lam=args.lam,
                         save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log, args=args)
-    episode_returns, freq_dict = agent_environment_loop(ppo_agent, env, device, num_update=args.total_steps // args.batch_size, log_dir=log_dir,
+    episode_returns, freq_dict = agent_environment_loop(ppo_agent, vec_env, device, num_update=args.total_steps // batch_size, log_dir=log_dir,
                                                         args=args)
     print(f'episode returns {episode_returns}')
-    #plot_alg_results(episode_returns, f"results/{args.num_agents}_{args.layout}.png", label="PPO", ylabel="Return")
+
+    bool_to_str = lambda x: "centralised" if x else "decentralised"
+    folder_path = os.path.join(PROJECT_ROOT, args.data_path)
+
     df = pd.DataFrame(episode_returns)
-    df.to_csv(f'data/{args.num_agents}_{args.layout}_returns_seed_{args.seed}.csv', index=False)
+    df.to_csv(os.path.join(folder_path, f'{bool_to_str(args.centralised)}_{args.num_agents}_{args.layout}_returns_seed_{args.seed}.csv'), index=False)
 
     df = pd.DataFrame(freq_dict["frequency_delivery_per_episode"])
-    df.to_csv(f'data/{args.num_agents}_{args.layout}_frequency_delivery_per_episode_seed_{args.seed}.csv', index=False)
+    df.to_csv(os.path.join(folder_path, f'{bool_to_str(args.centralised)}_{args.num_agents}_{args.layout}_frequency_delivery_per_episode_seed_{args.seed}.csv'), index=False)
+
     df = pd.DataFrame(freq_dict["frequency_plated_per_episode"])
-    df.to_csv(f'data/{args.num_agents}_{args.layout}_frequency_plated_per_episode_seed_{args.seed}.csv', index=False)
+    df.to_csv(os.path.join(folder_path, f'{bool_to_str(args.centralised)}_{args.num_agents}_{args.layout}_frequency_plated_per_episode_seed_{args.seed}.csv'), index=False)
+
     df = pd.DataFrame(freq_dict["frequency_ingredient_in_pot_per_episode"])
-    df.to_csv(f'data/{args.num_agents}_{args.layout}_frequency_ingredient_in_pot_per_episode_seed_{args.seed}.csv', index=False)
+    df.to_csv(os.path.join(folder_path, f'{bool_to_str(args.centralised)}_{args.num_agents}_{args.layout}_frequency_ingredient_in_pot_per_episode_seed_{args.seed}.csv'), index=False)
 
     # save args to file
-    with open(f'data/{args.num_agents}_{args.layout}_args_seed_{args.seed}.txt', 'w') as f:
+    with open(os.path.join(folder_path, f'{bool_to_str(args.centralised)}_{args.num_agents}_{args.layout}_args_seed_{args.seed}.txt'), 'w') as f:
         for arg in vars(args):
             f.write(f"{arg}: {getattr(args, arg)}\n")
     return

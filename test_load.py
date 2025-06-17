@@ -33,7 +33,10 @@ def make_env(num_agents=4, layout="large_overcooked_layout", render_mode="human"
 
 def main():
     num_agents = 2
-    layout = "overcooked_cramped_room_v0"
+    layout = "overcooked_coordination_ring_v0"
+    #layout = "overcooked_forced_coordination_v0"
+    #layout = "overcooked_counter_circuit_v0"
+    #layout = "overcooked_cramped_room_v0"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
     parser = argparse.ArgumentParser()
     
@@ -44,12 +47,13 @@ def main():
         default="models/policy.pth",
         help="Path to the trained model",
     )
+    parser.add_argument("--layout", type=str, default=layout, help="Layout of the Overcooked environment")
     args = parser.parse_args()
 
     env = make_env(num_agents=num_agents, layout=layout, render_mode="human")
     obs_space = env.observation_spaces[0]['n_agent_overcooked_features']  # box (-inf, inf, (404,), float32)
     action_space = env.action_spaces[0]  # Discrete(7)
-    nn = Agent(obs_space, action_space, num_agents=num_agents).to(device)  # neural network
+    nn = Agent(obs_space, action_space, num_agents=num_agents, num_envs=16).to(device)  # neural network
     nn.load_state_dict(torch.load(args.model_path, map_location=device))  # load the model
 
     mappo = MAPPO(env, None, nn, None, None, None, num_agents=num_agents)  # THE RL AGENT
