@@ -1,11 +1,11 @@
-# MARL
-Multiagent-PPO (Decentralised/centralised) on [cogrid](https://github.com/chasemcd/cogrid)
+# Overcooked MARL
+Multiagent-PPO (Decentralised/centralised) on [cogrid](https://github.com/chasemcd/cogrid)'s overcooked. 
 ## Prerequisite
 - `python >= 3.10`
 - `virtualenv env && source env/bin/activate`
 - pip3 install -r requirements.txt
 
-## File structures
+## File Structures
 ```bash
 ├── CentralizedMAPPO.py                      # Multi-agent PPO with Centralized critic.                                                
 ├── MAPPO.py                                 # Multi-agent PPO with Decentralized critic
@@ -21,7 +21,7 @@ Multiagent-PPO (Decentralised/centralised) on [cogrid](https://github.com/chasem
 ├── plot.py                                  
 ├── requirements.txt 
 ├── requirements_cc.txt         
-├── scripts                                  # Compute Canada tuning
+├── scripts                                  # Compute Canada sbatch script
 │   ├── CC_script.sh     
 │   └── param_tune.sh
 ├── test_load.py                              
@@ -29,14 +29,46 @@ Multiagent-PPO (Decentralised/centralised) on [cogrid](https://github.com/chasem
 └── video2gif.py
 ```
 
-## Running instruction '
-`python3 main.py --save-path models --num-agents 2 --num-envs 16 --layout overcooked_cramped_room_v0  --batch-size 256 --num-minibatches 4 \
-	--total-steps 20000000 --seed 2 --log --centralised --ppo-epoch 5 --clip-param 0.2 \
-	--value-loss-coef 0.5 --entropy-coef 0.01 --gamma 0.99 --lam 0.95 --max-grad-norm 0.5 --lr 3e-4 --data-path data`
- 
-or `make cramped` with makefile (runs the command above)
+## Basic Usage
+To train overcooked-ai, we call `main.py` with specified parameters.
 
+
+For example, you can train a `cramped-room` layout with 2 agents using:  
+```
+python3 main.py --save-path models --num-agents 2 --num-envs 16 --layout overcooked_cramped_room_v0  --batch-size 256 --num-minibatches 4 \
+	--total-steps 20000000 --seed 2 --log --centralised --ppo-epoch 5 --clip-param 0.2 \
+	--value-loss-coef 0.5 --entropy-coef 0.01 --gamma 0.99 --lam 0.95 --max-grad-norm 0.5 --lr 3e-4 --data-path data
+```
 current supported `layout`s are registered [here](https://github.com/chasemcd/cogrid/blob/f1beb729cf3ff8a939f385396a235007a5b2dd76/cogrid/envs/__init__.py#L13)
+
+```bash
+# main.py's arguments
+  --num-agents NUM_AGENTS        # number of agents
+  --num-envs NUM_ENVS            # number of parallel environment to generate samples
+  --layout LAYOUT                # layouts amongst [here](https://github.com/chasemcd/cogrid/blob/f1beb729cf3ff8a939f385396a235007a5b2dd76/cogrid/envs/__init__.py#L13)
+  --save-path SAVE_PATH          # path to save the NN model
+  --data-path DATA_PATH          # path to save the rewards and other metric csv files needed for plotting
+  --save                         # weather to Save the model
+  --total-steps TOTAL_STEPS      # total number of action agents take in the span of training
+  --num-steps NUM_STEPS          # number of steps per environment before updating the NN (PPO thing)
+  --num-minibatches NUM_MINIBATCHES
+  --log                          # whether to tensorboard log
+  --render                       # whether to render the env
+  --seed SEED                  
+  --lr LR                        # learning rate
+
+## PPO specific hyperparams
+
+  --ppo-epoch PPO_EPOCH
+  --clip-param CLIP_PARAM
+  --value-loss-coef VALUE_LOSS_COEF
+  --entropy-coef ENTROPY_COEF
+  --max-grad-norm MAX_GRAD_NORM
+  --gamma GAMMA                  # discount factor
+  --lam LAM                      # lambda for GAE
+  --centralised                  # False is decentralised MAPPO, True is centralised MAPPO
+```
+
 ## Generating plots
 After training is finished, a data directory is generated inside `data-path`. This directory contains metric to be plotted.
 - `python3 plot.py --folder <data-path> --keyword {returns, delivery, pot}` 
