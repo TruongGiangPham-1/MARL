@@ -71,7 +71,15 @@ current supported `layout`s are registered [here](https://github.com/chasemcd/co
 
 ## Generating plots
 After training is finished, a data directory is generated inside `data-path`. This directory contains metric to be plotted.
-- `python3 plot.py --folder <data-path> --keyword {returns, delivery, pot}` 
+```
+python3 plot.py --folder <data-path> --keyword {returns, delivery, pot}
+```
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/a240b0dc-2ec6-4586-bdbf-9ad38d3e5f03" alt="Overcooked" width="45%" />
+  <img src="https://github.com/user-attachments/assets/b7eac1cf-3dfa-48d9-a71a-19a12cbb64c2" alt="Overcooked Delivery" width="45%" />
+</p>
+  
 ## Test Running the model
 `Assuming there exist a model object model/policy.pth`
 - `python3 test_load.py --model-path <path-to-policy.pth>`
