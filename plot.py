@@ -18,8 +18,10 @@ def main():
     if keyword == "returns":
         produce_plots_for_all_configs(folder_name, keyword)
     elif keyword == "pot":
+        print("Plotting pot data")
         produce_plots_for_all_configs(folder_name, keyword)
     elif keyword == "delivery":
+        print("Plotting delivery data")
         produce_plots_for_all_configs(folder_name, keyword)
     return
 
@@ -58,6 +60,7 @@ def produce_plots_for_all_configs(folder_name="data", keyword="returns"):
             elif keyword == "pot":
                 plot_ingredients_in_pots(data_dict[configuration], f"Overcooked_ingredients_in_pots.png", label="",title="Overcooked_2 agents in cramped room - Ingredients in Pots",  ylabel="frequency")
             elif keyword == "delivery":
+                print(f"Plotting delivery data for {configuration}")
                 plot_ingredients_in_pots(data_dict[configuration], f"Overcooked_delivery.png", label="",title="Overcooked_2 agents in cramped room - Delivery",  ylabel="frequency")
 
 
@@ -96,7 +99,7 @@ def plot_ingredients_in_pots(episode_returns_list, file, label="Algorithm", ylab
     if 'Ant' in file:
         plt.title(f"")
     else:
-        plt.title(f"Overcooked_2 agents in cramped room - Ingredients in Pots")
+        plt.title(title)
     plt.xlabel("episode")
     plt.ylabel(ylabel)
 
