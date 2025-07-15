@@ -3,7 +3,6 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
 import argparse
 
 def main():
@@ -25,12 +24,13 @@ def main():
             'Local Observation',
             'Global Observation',
         ]
-        running_avg1 = produce_plots_for_all_configs(folder_name=folders[0], keyword=keyword)  # local obs
-        running_avg2 = produce_plots_for_all_configs(folder_name=folders[1], keyword=keyword)  # global obs
+        running_avg1, episode_returns1 = produce_plots_for_all_configs(folder_name=folders[0], keyword=keyword)  # local obs
+        running_avg2, episode_returns2 = produce_plots_for_all_configs(folder_name=folders[1], keyword=keyword)  # global obs
         running_avg_lists.append(running_avg1)
         running_avg_lists.append(running_avg2)
+        episode_returns_lists = [episode_returns1, episode_returns2]
 
-        plot_comparisons(running_avg_lists, configs=configs)
+        plot_comparisons(running_avg_lists, configs=configs, episode_returns_lists=episode_returns_lists)
         return
 
     if keyword == "returns":
@@ -58,16 +58,28 @@ def extract_config(filename_without_ext):
 plot comparisons of running averages for different configurations
 
 """
-def plot_comparisons(running_avg_lists, configs=['config1', 'config2']):
+def plot_comparisons(running_avg_lists, configs=['config1', 'config2'], episode_returns_lists=None):
     """
     Plot all running averages for all configurations.
     """
-    print(f"Plotting comparisons for {(running_avg_lists)} configurations")
+    print(f"Plotting comparisons for {len(running_avg_lists)} configurations")
     plt.figure(figsize=(10, 6))
-    for config, running_avg in zip(configs, running_avg_lists):
+    
+    # Define colors for each configuration
+    colors = plt.cm.tab10(range(len(configs)))  # Use matplotlib's tab10 colormap
+    
+    # Plot individual seeds with light transparency if provided
+    if episode_returns_lists:
+        for config_idx, (config, episode_returns) in enumerate(zip(configs, episode_returns_lists)):
+            for seed_returns in episode_returns:
+                x_coords = [i + 1 for i in range(len(seed_returns))]
+                plt.plot(x_coords, seed_returns, color=colors[config_idx], alpha=0.3)
+    
+    # Plot running averages for each configuration
+    for config_idx, (config, running_avg) in enumerate(zip(configs, running_avg_lists)):
         print(f"Plotting {config} with {len(running_avg)} points")
         x_coords = [i + 1 for i in range(len(running_avg))]
-        plt.plot(x_coords, running_avg, label=config)
+        plt.plot(x_coords, running_avg, label=config, linewidth=2, color=colors[config_idx])
     
     plt.xlabel("Episode")
     plt.ylabel("Running Average Return")
@@ -100,14 +112,14 @@ def produce_plots_for_all_configs(folder_name="data", keyword="returns"):
     for configuration in configs:
         if data_dict[configuration]:
             if keyword == "returns":
-                running_avg = plot_alg_results(data_dict[configuration], f"Overcooked.png", label="Running average")
+                running_avg, list_of_list = plot_alg_results(data_dict[configuration], f"Overcooked.png", label="Running average")
             elif keyword == "pot":
-                running_avg = plot_ingredients_in_pots(data_dict[configuration], f"Overcooked_ingredients_in_pots.png", label="",title="Overcooked_2 agents in cramped room - Ingredients in Pots",  ylabel="frequency")
+                running_avg, list_of_list = plot_ingredients_in_pots(data_dict[configuration], f"Overcooked_ingredients_in_pots.png", label="",title="Overcooked_2 agents in cramped room - Ingredients in Pots",  ylabel="frequency")
             elif keyword == "delivery":
                 print(f"Plotting delivery data for {configuration}")
-                running_avg = plot_ingredients_in_pots(data_dict[configuration], f"Overcooked_delivery.png", label="",title="Overcooked_2 agents in cramped room - Delivery",  ylabel="frequency")
+                running_avg, list_of_list = plot_ingredients_in_pots(data_dict[configuration], f"Overcooked_delivery.png", label="",title="Overcooked_2 agents in cramped room - Delivery",  ylabel="frequency")
     
-    return running_avg
+    return running_avg, list_of_list
 
 
 def plot_ingredients_in_pots(episode_returns_list, file, label="Algorithm", ylabel="frequency", title="overcooked ingredient in pots", eval_interval=1000):
@@ -157,7 +169,7 @@ def plot_ingredients_in_pots(episode_returns_list, file, label="Algorithm", ylab
 
     # Display the plot
     plt.savefig(file)
-    return running_avg
+    return running_avg, episode_returns_list
 
 
 def plot_alg_results(episode_returns_list, file, label="Algorithm", ylabel="Return",title="overcooked rewards",  eval_interval=1000):
@@ -207,7 +219,7 @@ def plot_alg_results(episode_returns_list, file, label="Algorithm", ylabel="Retu
 
     # Display the plot
     plt.savefig(file)
-    return running_avg
+    return running_avg, episode_returns_list
 
 
 if __name__ == "__main__":
