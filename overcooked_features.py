@@ -81,6 +81,8 @@ class NAgentOvercookedFeatureSpace(feature.Feature):
         full_shape = num_agents * np.sum(
             [feature.shape for feature in self.agent_features]
         )
+
+        full_shape = np.sum([feature.shape for feature in self.agent_features])  # 101
         #feature_sum = 0
         #feature_dict = {
 
@@ -109,10 +111,10 @@ class NAgentOvercookedFeatureSpace(feature.Feature):
     ) -> np.ndarray:
         player_encodings = [self.generate_player_encoding(env, player_id)]
 
-        for pid in env.agent_ids:
-            if pid == player_id:
-                continue
-            player_encodings.append(self.generate_player_encoding(env, pid))
+        #for pid in env.agent_ids:
+        #    if pid == player_id:
+        #        continue
+        #    player_encodings.append(self.generate_player_encoding(env, pid))
 
         encoding = np.hstack(player_encodings).astype(np.float32)
 
