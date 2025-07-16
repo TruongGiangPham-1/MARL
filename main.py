@@ -27,7 +27,7 @@ import os
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 print(f'PROJECT_ROOT: {PROJECT_ROOT}')
 
-def make_env(num_agents=4, layout="large_overcooked_layout", render_mode="human"):
+def make_env(num_agents=4, layout="large_overcooked_layout", feature="global_obs", render_mode="human"):
     """
     Normal overcooked envs
     obs spaces:
@@ -48,6 +48,7 @@ def make_env(num_agents=4, layout="large_overcooked_layout", render_mode="human"
     config = N_agent_overcooked_config.copy()  # get config obj
     config["num_agents"] = num_agents
     config["grid"]["layout"] = layout
+    config["features"] = feature  # set the feature to use for the environment
 
     # Finally, we register the environment with CoGrid. This makes it convenient
     # to instantiate the environment from the registry as we do below, but you could
@@ -121,6 +122,7 @@ def main():
     parser.add_argument('--log', action='store_true', default=False, help='log the training to tensorboard')
     parser.add_argument('--render', action='store_true', default=False, help='render the env')
     parser.add_argument('--seed', type=int, default=1,  help='seed')
+    parser.add_argument("--feature", type=str, default="global_obs", help="feature to use for the environment")
     
     # ppo args
     """
@@ -163,7 +165,7 @@ def main():
 
     # ENV stuff ----------
     render_mode = "human" if args.render else None
-    env = make_env(args.num_agents, layout=args.layout, render_mode=render_mode)
+    env = make_env(args.num_agents, layout=args.layout, feature=args.feature, render_mode=render_mode)
     vec_env = make_vector_env(num_envs=args.num_envs, overcooked_env=env)  # create vectorized environments.
     assert vec_env.num_envs == args.num_envs*args.num_agents, f"Number of environments {vec_env.num_envs} does not match num_envs*args.num_agents {args.num_envs*args.num_agents}"
     vec_env.reset()

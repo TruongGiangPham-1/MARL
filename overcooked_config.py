@@ -6,24 +6,17 @@ from cogrid.envs.overcooked import overcooked
 from cogrid.core import layouts
 from cogrid.envs import registry
 
-from overcooked_features import NAgentOvercookedFeatureSpace
+from overcooked_features import globalObs, localObs
 
 # CoGrid is based on a registry system, so we need to register the feature
 # that we want to use for the environment. You can do this in any imported
 # file, but we're doing it here for clarity.
 feature_space.register_feature(
-    "n_agent_overcooked_features", NAgentOvercookedFeatureSpace
+    "global_obs", globalObs 
 )
 
-
-
-from overcooked_features import NAgentOvercookedFeatureSpace
-
-# CoGrid is based on a registry system, so we need to register the feature
-# that we want to use for the environment. You can do this in any imported
-# file, but we're doing it here for clarity.
 feature_space.register_feature(
-    "n_agent_overcooked_features", NAgentOvercookedFeatureSpace
+    "local_obs", localObs
 )
 
 
@@ -81,7 +74,7 @@ N_agent_overcooked_config = {
     # you have more than one or as a dictionary keyed by agent ID
     # and a list of feature names for each agent if different
     # agents should have different observation spaces.
-    "features": "n_agent_overcooked_features",
+    "features": "global_obs",
     # In the same way that we register features and
     # layouts, we can also register reward functions.
     # The delivery reward (common reward of +1 whenever a

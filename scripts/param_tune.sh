@@ -14,22 +14,23 @@
 #echo "lr: ${12}"
 #echo "data_path: ${13}"
 #echo "layout: ${14}"
+#echo "feature: ${15}"
 
 # different LR
-sbatch CC_script.sh 16 256 4 20000000 2 5 0.05 0.1 0.1 0.99 0.95 1e-4 data1 overcooked_cramped_room_v0
-sbatch CC_script.sh 16 256 4 20000000 2 5 0.05 0.1 0.1 0.99 0.95 3e-4 data2 overcooked_cramped_room_v0
-sbatch CC_script.sh 16 256 4 20000000 2 5 0.05 0.1 0.1 0.99 0.95 5e-4 data3 overcooked_cramped_room_v0
+sbatch CC_script.sh 16 256 4 20000000 2 5 0.05 0.1 0.1 0.99 0.95 1e-4 data1 overcooked_cramped_room_v0 global_obs
+sbatch CC_script.sh 16 256 4 20000000 2 5 0.05 0.1 0.1 0.99 0.95 3e-4 data2 overcooked_cramped_room_v0 global_obs
+sbatch CC_script.sh 16 256 4 20000000 2 5 0.05 0.1 0.1 0.99 0.95 5e-4 data3 overcooked_cramped_room_v0 global_obs
 
 # different ppo epoch
-sbatch CC_script.sh 16 256 4 20000000 2 7 0.05 0.1 0.1 0.99 0.95 1e-4 data5 overcooked_cramped_room_v0
-sbatch CC_script.sh 16 256 4 20000000 2 10 0.05 0.1 0.1 0.99 0.95 1e-4 data6 overcooked_cramped_room_v0
+sbatch CC_script.sh 16 256 4 20000000 2 7 0.05 0.1 0.1 0.99 0.95 1e-4 data5 overcooked_cramped_room_v0 global_obs
+sbatch CC_script.sh 16 256 4 20000000 2 10 0.05 0.1 0.1 0.99 0.95 1e-4 data6 overcooked_cramped_room_v0 global_obs
 
 # different entropy coef
-sbatch CC_script.sh 16 256 4 20000000 2 5 0.05 0.1 0.01 0.99 0.95 1e-4 data7 overcooked_cramped_room_v0
+sbatch CC_script.sh 16 256 4 20000000 2 5 0.05 0.1 0.01 0.99 0.95 1e-4 data7 overcooked_cramped_room_v0 global_obs
 
 # different seed
-sbatch CC_script.sh 16 256 4 20000000 1 5 0.05 0.1 0.01 0.99 0.95 3e-4 data7 overcooked_cramped_room_v0
-sbatch CC_script.sh 16 256 4 20000000 3 5 0.05 0.1 0.01 0.99 0.95 3e-4 data7 overcooked_cramped_room_v0
+sbatch CC_script.sh 16 256 4 20000000 1 5 0.05 0.1 0.01 0.99 0.95 3e-4 data7 overcooked_cramped_room_v0 global_obs
+sbatch CC_script.sh 16 256 4 20000000 3 5 0.05 0.1 0.01 0.99 0.95 3e-4 data7 overcooked_cramped_room_v0 global_obs
 
 
 
