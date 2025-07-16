@@ -14,10 +14,11 @@ from cogrid.core.actions import Actions
 from MAPPO import MAPPO
 #env
 
-def make_env(num_agents=4, layout="large_overcooked_layout", render_mode="human"):
+def make_env(num_agents=4, layout="large_overcooked_layout", feature="global_obs", render_mode="human"):
     config = N_agent_overcooked_config.copy()  # get config obj
     config["num_agents"] = num_agents
     config["grid"]["layout"] = layout
+    config["feature"] = feature  # set feature to global_obs or local_obs
 
     # Finally, we register the environment with CoGrid. This makes it convenient
     # to instantiate the environment from the registry as we do below, but you could

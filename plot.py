@@ -3,17 +3,35 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
 import argparse
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--folder", type=str, default="data", help="path to the folder containing csv")
     parser.add_argument("--keyword", type=str, default="returns", help="keyword to filter csv files")
+    parser.add_argument("--compare", action="store_true", help="compare different configurations")
     args = parser.parse_args()
     folder_name = args.folder
     keyword = args.keyword
+    compare = args.compare
     running_avg_range = 100
+
+    if compare:
+        print("Plotting all layouts")
+        running_avg_lists = []
+        folders = ['data0714_local_obs', 'data0609']  # comparing partial obs and full obs
+        configs = [
+            'Local Observation',
+            'Global Observation',
+        ]
+        running_avg1, episode_returns1 = produce_plots_for_all_configs(folder_name=folders[0], keyword=keyword)  # local obs
+        running_avg2, episode_returns2 = produce_plots_for_all_configs(folder_name=folders[1], keyword=keyword)  # global obs
+        running_avg_lists.append(running_avg1)
+        running_avg_lists.append(running_avg2)
+        episode_returns_lists = [episode_returns1, episode_returns2]
+
+        plot_comparisons(running_avg_lists, configs=configs, episode_returns_lists=episode_returns_lists)
+        return
 
     if keyword == "returns":
         produce_plots_for_all_configs(folder_name, keyword)
@@ -23,22 +41,59 @@ def main():
     elif keyword == "delivery":
         print("Plotting delivery data")
         produce_plots_for_all_configs(folder_name, keyword)
+
     return
 
 
 def extract_config(filename_without_ext):
-    configs = ['seed_1', 'seed_2', 'seed_3', 'seed_4']
+    seeds = ['seed_1', 'seed_2', 'seed_3', 'seed_4']
+    configs = ['overcooked_cramped_room_v0', 'overcooked_forced_coordination_v0']
     for configuration in configs:
         if configuration in filename_without_ext:
             return configuration
     return None
 
+"""
+
+plot comparisons of running averages for different configurations
+
+"""
+def plot_comparisons(running_avg_lists, configs=['config1', 'config2'], episode_returns_lists=None):
+    """
+    Plot all running averages for all configurations.
+    """
+    print(f"Plotting comparisons for {len(running_avg_lists)} configurations")
+    plt.figure(figsize=(10, 6))
+    
+    # Define colors for each configuration
+    colors = plt.cm.tab10(range(len(configs)))  # Use matplotlib's tab10 colormap
+    
+    # Plot individual seeds with light transparency if provided
+    if episode_returns_lists:
+        for config_idx, (config, episode_returns) in enumerate(zip(configs, episode_returns_lists)):
+            for seed_returns in episode_returns:
+                x_coords = [i + 1 for i in range(len(seed_returns))]
+                plt.plot(x_coords, seed_returns, color=colors[config_idx], alpha=0.3)
+    
+    # Plot running averages for each configuration
+    for config_idx, (config, running_avg) in enumerate(zip(configs, running_avg_lists)):
+        print(f"Plotting {config} with {len(running_avg)} points")
+        x_coords = [i + 1 for i in range(len(running_avg))]
+        plt.plot(x_coords, running_avg, label=config, linewidth=2, color=colors[config_idx])
+    
+    plt.xlabel("Episode")
+    plt.ylabel("Running Average Return")
+    plt.title("Running Average Returns for Different Configurations")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig("all_layouts_running_avg.png")
 
 """
 Load all returns.csv files and plot them
 """
 def produce_plots_for_all_configs(folder_name="data", keyword="returns"):
-    configs = ['seed_1', 'seed_2', 'seed_3', 'seed_4']
+    seeds = ['seed_1', 'seed_2', 'seed_3', 'seed_4']
+    configs = ["overcooked_cramped_room_v0", "overcooked_forced_coordination_v0"]
     data_dict = {}
     for configuration in configs:
         data_dict[configuration] = []
@@ -53,15 +108,18 @@ def produce_plots_for_all_configs(folder_name="data", keyword="returns"):
                 df = pd.read_csv(full_path)
                 data_dict[config].append(np.squeeze(df.values))
 
+    running_avg = None
     for configuration in configs:
         if data_dict[configuration]:
             if keyword == "returns":
-                plot_alg_results(data_dict[configuration], f"Overcooked.png", label="Running average")
+                running_avg, list_of_list = plot_alg_results(data_dict[configuration], f"Overcooked.png", label="Running average")
             elif keyword == "pot":
-                plot_ingredients_in_pots(data_dict[configuration], f"Overcooked_ingredients_in_pots.png", label="",title="Overcooked_2 agents in cramped room - Ingredients in Pots",  ylabel="frequency")
+                running_avg, list_of_list = plot_ingredients_in_pots(data_dict[configuration], f"Overcooked_ingredients_in_pots.png", label="",title="Overcooked_2 agents in cramped room - Ingredients in Pots",  ylabel="frequency")
             elif keyword == "delivery":
                 print(f"Plotting delivery data for {configuration}")
-                plot_ingredients_in_pots(data_dict[configuration], f"Overcooked_delivery.png", label="",title="Overcooked_2 agents in cramped room - Delivery",  ylabel="frequency")
+                running_avg, list_of_list = plot_ingredients_in_pots(data_dict[configuration], f"Overcooked_delivery.png", label="",title="Overcooked_2 agents in cramped room - Delivery",  ylabel="frequency")
+    
+    return running_avg, list_of_list
 
 
 def plot_ingredients_in_pots(episode_returns_list, file, label="Algorithm", ylabel="frequency", title="overcooked ingredient in pots", eval_interval=1000):
@@ -111,6 +169,7 @@ def plot_ingredients_in_pots(episode_returns_list, file, label="Algorithm", ylab
 
     # Display the plot
     plt.savefig(file)
+    return running_avg, episode_returns_list
 
 
 def plot_alg_results(episode_returns_list, file, label="Algorithm", ylabel="Return",title="overcooked rewards",  eval_interval=1000):
@@ -160,6 +219,7 @@ def plot_alg_results(episode_returns_list, file, label="Algorithm", ylabel="Retu
 
     # Display the plot
     plt.savefig(file)
+    return running_avg, episode_returns_list
 
 
 if __name__ == "__main__":

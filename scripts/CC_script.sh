@@ -32,7 +32,10 @@ echo $11 # lam
 echo $12 # lr
 
 echo $13 # data_path
+echo $14 # layout
+echo $15 # feature
 
-python3 ../main.py --save-path models --num-agents 2 --num-envs $1 --layout overcooked_cramped_room_v0  --num-steps $2 --num-minibatches $3 \
+python3 ../main.py --save-path models --num-agents 2 --num-envs $1 --num-steps $2 --num-minibatches $3 \
 --total-steps $4 --seed $5  --ppo-epoch $6 --clip-param $7 \
---value-loss-coef $8 --entropy-coef $9 --gamma $10 --lam $11 --max-grad-norm 0.5 --lr $12 --data-path $13
+--value-loss-coef $8 --entropy-coef $9 --gamma $10 --lam $11 --max-grad-norm 0.5 --lr $12 --data-path $13 --layout $14 \
+--feature $15
