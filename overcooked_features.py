@@ -227,6 +227,59 @@ class localObs(feature.Feature):
             encoded_features.append(feature.generate(env, player_id))
 
         return np.hstack(encoded_features)
+    
+class onlyDirection(feature.Feature):
+    """
+    A feature that only returns the direction of the agent.
+    """
+
+    def __init__(self, env, **kwargs):
+        num_agents = env.config["num_agents"]
+
+        self.agent_features = [
+            # Represent the direction of the agent
+            features.AgentDir(),
+            # The current inventory of the agent (max=1 item)
+            overcooked_features.OvercookedInventory(),
+            # One-hot indicator if there is a counter or pot in each of the four cardinal directions
+            overcooked_features.NextToCounter(),
+            overcooked_features.NextToPot(),
+            overcooked_features.DistToOtherPlayers(
+                num_other_players=num_agents - 1
+            ),
+            # The (row, column) position of the agent
+            features.AgentPosition(),
+            # The direction the agent can move in
+            features.CanMoveDirection(),
+        ]
+
+        full_shape = np.sum(
+            [feature.shape for feature in self.agent_features]
+        )
+        super().__init__(
+            low=-np.inf,
+            high=np.inf,
+            shape=(full_shape,),
+            name="n_agent_overcooked_features",
+            **kwargs,
+        )
+
+    def generate(
+        self, env: cogrid_env.CoGridEnv, player_id, **kwargs
+    ) -> np.ndarray:
+        player_encodings = [self.generate_player_encoding(env, player_id)]
+        encoding = np.hstack(player_encodings).astype(np.float32)
+        assert np.array_equal(self.shape, encoding.shape)
+        return encoding
+
+    def generate_player_encoding(
+        self, env: cogrid_env.CoGridEnv, player_id: str | int
+    ) -> np.ndarray:
+        encoded_features = []
+        for feature in self.agent_features:
+            encoded_features.append(feature.generate(env, player_id))
+        return np.hstack(encoded_features)
+
 
 
 class SuccessfullyDeliveredSoup(feature.Feature):

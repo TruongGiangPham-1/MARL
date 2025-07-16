@@ -41,9 +41,12 @@ For example, you can train a `cramped-room` layout with 2 agents using:
 ```
 python3 main.py --save-path models --num-agents 2 --num-envs 16 --layout overcooked_cramped_room_v0  --batch-size 256 --num-minibatches 4 \
 	--total-steps 20000000 --seed 2 --log --centralised --ppo-epoch 5 --clip-param 0.2 \
-	--value-loss-coef 0.5 --entropy-coef 0.01 --gamma 0.99 --lam 0.95 --max-grad-norm 0.5 --lr 3e-4 --data-path data
+	--value-loss-coef 0.5 --entropy-coef 0.01 --gamma 0.99 --lam 0.95 --max-grad-norm 0.5 --lr 3e-4 --data-path data \
+  --feature global_obs
 ```
 current supported `layout`s are registered [here](https://github.com/chasemcd/cogrid/blob/f1beb729cf3ff8a939f385396a235007a5b2dd76/cogrid/envs/__init__.py#L13)
+
+current feature set is `global_obs`, `local_obs`, `only_direction`
 
 ```bash
 # main.py's arguments
@@ -88,3 +91,7 @@ python3 plot.py --folder <data-path> --keyword {returns, delivery, pot}
 `Assuming there exist a model object model/policy.pth`
 - `python3 test_load.py --model-path <path-to-policy.pth>`
 - Example `python3 test_load.py --model-path model/policy.pth`
+
+## Overcooked Features
+`AgebtDir`: One hot of size 4. [RIGHT, DOWN, LEFT, UP]
+``

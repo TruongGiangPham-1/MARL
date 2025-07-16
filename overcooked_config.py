@@ -6,7 +6,7 @@ from cogrid.envs.overcooked import overcooked
 from cogrid.core import layouts
 from cogrid.envs import registry
 
-from overcooked_features import globalObs, localObs
+from overcooked_features import globalObs, localObs, onlyDirection
 
 # CoGrid is based on a registry system, so we need to register the feature
 # that we want to use for the environment. You can do this in any imported
@@ -17,6 +17,10 @@ feature_space.register_feature(
 
 feature_space.register_feature(
     "local_obs", localObs
+)
+
+feature_space.register_feature(
+    "only_direction", onlyDirection
 )
 
 
