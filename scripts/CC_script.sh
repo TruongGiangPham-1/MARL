@@ -4,7 +4,7 @@
 #SBATCH --ntasks-per-node=2
 #SBATCH --mem=32G
 #SBATCH --time=60:00:00
-#SBATCH --account=rrg-mtaylor3
+#SBATCH --account=aip-mtaylor3
 #SBATCH --output=/home/truonggi/scratch/slurm_out/%A.out
 #SBATCH --mail-user=truonggi@ualberta.ca
 #SBATCH --mail-type=ALL
