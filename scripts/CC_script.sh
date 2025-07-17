@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=1
-#SBATCH --ntasks-per-node=16
+#SBATCH --ntasks-per-node=2
 #SBATCH --mem=32G
 #SBATCH --time=60:00:00
 #SBATCH --account=rrg-mtaylor3
@@ -16,7 +16,7 @@ export data=$SLURM_TMPDIR/data
 module load python/3.10
 module load cuda
 module load gcc opencv/4.9.0
-source /home/truonggi/scratch/MARL/env/bin/activate
+source /home/truonggi/projects/aip-mtaylor3/truonggi/MARL/env/bin/activate 
 
 echo $1 # num_envs
 echo $2 # num_steps
