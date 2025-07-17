@@ -19,18 +19,21 @@ def main():
     if compare:
         print("Plotting all layouts")
         running_avg_lists = []
-        folders = ['data0714_local_obs', 'data0609']  # comparing partial obs and full obs
+        episode_returns_lists = []
+        folders = ['cramped_only_direction', 'data0609', 'data0714_local_obs']  # comparing partial obs and full obs
         configs = [
-            'Local Observation',
+            'Only Direction',
             'Global Observation',
+            'Local Observation'
         ]
-        running_avg1, episode_returns1 = produce_plots_for_all_configs(folder_name=folders[0], keyword=keyword)  # local obs
-        running_avg2, episode_returns2 = produce_plots_for_all_configs(folder_name=folders[1], keyword=keyword)  # global obs
-        running_avg_lists.append(running_avg1)
-        running_avg_lists.append(running_avg2)
-        episode_returns_lists = [episode_returns1, episode_returns2]
 
-        plot_comparisons(running_avg_lists, configs=configs, episode_returns_lists=episode_returns_lists)
+        for folder in folders:
+            running_avg, episode_returns = produce_plots_for_all_configs(folder_name=folder, keyword=keyword)
+            running_avg_lists.append(running_avg)
+            episode_returns_lists.append(episode_returns)
+
+        plot_comparisons(running_avg_lists, configs=configs, episode_returns_lists=episode_returns_lists, 
+                         title="Different Visibility of 2 agents in cramped room")
         return
 
     if keyword == "returns":
@@ -58,7 +61,7 @@ def extract_config(filename_without_ext):
 plot comparisons of running averages for different configurations
 
 """
-def plot_comparisons(running_avg_lists, configs=['config1', 'config2'], episode_returns_lists=None):
+def plot_comparisons(running_avg_lists, configs=['config1', 'config2'], episode_returns_lists=None, title=None):
     """
     Plot all running averages for all configurations.
     """
@@ -174,7 +177,16 @@ def plot_ingredients_in_pots(episode_returns_list, file, label="Algorithm", ylab
 
 def plot_alg_results(episode_returns_list, file, label="Algorithm", ylabel="Return",title="overcooked rewards",  eval_interval=1000):
     """
-    episode_returns_list: list of episode returns. If there is 3 seeds, then the list should have 3 lists.
+    Plot one algorithm's results by averaging over seeds.
+    Args:
+        episode_returns_list (list[list[float]]): list of episode returns. [returns_seed_1, returns_seed_2, ...]
+        file (str): file name to save the plot.
+        label (str): label for the algorithm in the plot.
+        ylabel (str): label for the y-axis.
+        title (str): title of the plot.
+    Returns:
+        running_avg (np.ndarray): running average of the returns. dim (1, num_episodes/steps)
+        episode_returns_list (list[list[float]]): the input list of returns, unchanged.
     """
     # Compute running average
     print(len(episode_returns_list))
