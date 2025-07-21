@@ -18,8 +18,7 @@ def make_env(num_agents=4, layout="large_overcooked_layout", feature="global_obs
     config = N_agent_overcooked_config.copy()  # get config obj
     config["num_agents"] = num_agents
     config["grid"]["layout"] = layout
-    config["feature"] = feature  # set feature to global_obs or local_obs
-
+    config["features"] = feature  # set feature to global_obs or local_obs
     # Finally, we register the environment with CoGrid. This makes it convenient
     # to instantiate the environment from the registry as we do below, but you could
     # also just pass the config to the Overcooked constructor directly.
@@ -49,8 +48,8 @@ def main():
     num_agents = 2
     #layout = "overcooked_coordination_ring_v0"
     #layout = "overcooked_forced_coordination_v0"
-    #layout = "overcooked_counter_circuit_v0"
-    layout = "overcooked_cramped_room_v0"
+    layout = "overcooked_counter_circuit_v0"
+    #layout = "overcooked_cramped_room_v0"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
     parser = argparse.ArgumentParser()
     
@@ -58,16 +57,17 @@ def main():
     parser.add_argument(
         "--model-path",
         type=str,
-        default="models/policy.pth",
+        default="models/decentralized_cramped_minimal_spatial_other_agent_aware.pth",
         help="Path to the trained model",
     )
     parser.add_argument("--layout", type=str, default=layout, help="Layout of the Overcooked environment")
     args = parser.parse_args()
 
-    env = make_env(num_agents=num_agents, layout=layout, render_mode="human")
+    env = make_env(num_agents=num_agents, layout=layout, render_mode="human", feature="Minimal_spatial_other_agent_aware")  # create the environment
     obs_space = env.observation_spaces[0]['n_agent_overcooked_features']  # box (-inf, inf, (404,), float32)
+    print(f'obs_space is {obs_space}')  # obs_space is Box(-inf, inf, (404,), float32)
     action_space = env.action_spaces[0]  # Discrete(7)
-    nn = Agent(obs_space, action_space, num_agents=num_agents, num_envs=1).to(device)  # neural network
+    nn = Agent(obs_space, action_space, num_agents=num_agents, num_envs=16).to(device)  # neural network
     nn.load_state_dict(torch.load(args.model_path, map_location=device))  # load the model
 
     mappo = MAPPO(env, None, nn, None, None, None, num_agents=num_agents)  # THE RL AGENT
