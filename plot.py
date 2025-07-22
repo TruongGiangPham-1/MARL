@@ -20,11 +20,15 @@ def main():
         print("Plotting all layouts")
         running_avg_lists = []
         episode_returns_lists = []
-        folders = ['cramped_only_direction', 'data0609', 'data0714_local_obs']  # comparing partial obs and full obs
+        folders = ['datas/data0609', 
+                   'datas/data0714_local_obs', 
+                   'datas/data0716-cramped_minimal_other_agent_aware',
+                   'datas/data0717_cramped_minimal_spatial']  # comparing partial obs and full obs
         configs = [
-            'Only Direction',
             'Global Observation',
-            'Local Observation'
+            'Local Observation',
+            'Minimal Spatial Other Agent Aware',
+            'Minimal Spatial'
         ]
 
         for folder in folders:
@@ -33,7 +37,7 @@ def main():
             episode_returns_lists.append(episode_returns)
 
         plot_comparisons(running_avg_lists, configs=configs, episode_returns_lists=episode_returns_lists, 
-                         title="Different Visibility of 2 agents in cramped room")
+                         title="Different Visibility of 2 agents in forced coordination room")
         return
 
     if keyword == "returns":
@@ -76,7 +80,7 @@ def plot_comparisons(running_avg_lists, configs=['config1', 'config2'], episode_
         for config_idx, (config, episode_returns) in enumerate(zip(configs, episode_returns_lists)):
             for seed_returns in episode_returns:
                 x_coords = [i + 1 for i in range(len(seed_returns))]
-                plt.plot(x_coords, seed_returns, color=colors[config_idx], alpha=0.3)
+                plt.plot(x_coords, seed_returns, color=colors[config_idx], alpha=0.2)
     
     # Plot running averages for each configuration
     for config_idx, (config, running_avg) in enumerate(zip(configs, running_avg_lists)):
