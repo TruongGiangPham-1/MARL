@@ -228,9 +228,9 @@ class localObs(feature.Feature):
 
         return np.hstack(encoded_features)
     
-class onlyDirection(feature.Feature):
+class MinimalSpatialOtherAgentAware(feature.Feature):
     """
-    A feature that only returns the direction of the agent.
+    MinimalSpatial but knows distance to other agents.
     """
 
     def __init__(self, env, **kwargs):
@@ -280,6 +280,157 @@ class onlyDirection(feature.Feature):
             encoded_features.append(feature.generate(env, player_id))
         return np.hstack(encoded_features)
 
+
+class MinimalSpatial(feature.Feature):
+    """
+    Minimal spatial awareness - only immediate surroundings and self state.
+    Good for testing agents with limited environmental awareness.
+    """
+
+    def __init__(self, env, **kwargs):
+        self.agent_features = [
+            features.AgentDir(),
+            overcooked_features.OvercookedInventory(),
+            overcooked_features.NextToCounter(),
+            overcooked_features.NextToPot(),
+            features.AgentPosition(),
+            features.CanMoveDirection(),
+        ]
+
+        full_shape = np.sum([feat.shape for feat in self.agent_features])
+        super().__init__(
+            low=-np.inf, high=np.inf, shape=(full_shape,),
+            name="n_agent_overcooked_features", **kwargs,
+        )
+
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        encoded_features = []
+        for feat in self.agent_features:
+            encoded_features.append(feat.generate(env, player_id))
+        encoding = np.hstack(encoded_features).astype(np.float32)
+        assert np.array_equal(self.shape, encoding.shape)
+        return encoding
+
+class TaskFocused(feature.Feature):
+    """
+    Task-oriented features focusing on cooking workflow.
+    Includes ingredients, pots, and delivery but minimal spatial info.
+    Missing adjacent tiles information
+    """
+
+    def __init__(self, env, **kwargs):
+        self.agent_features = [
+            features.AgentDir(),
+            overcooked_features.OvercookedInventory(),
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.Onion, n=2),
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.Plate, n=2),
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.OnionStack, n=1),
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.PlateStack, n=1),
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.OnionSoup, n=2),
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.DeliveryZone, n=1),
+            overcooked_features.NClosestPotFeatures(num_pots=1),
+            features.AgentPosition(),
+            features.CanMoveDirection(),
+        ]
+
+        full_shape = np.sum([feat.shape for feat in self.agent_features])
+        super().__init__(
+            low=-np.inf, high=np.inf, shape=(full_shape,),
+            name="task_focused_features", **kwargs,
+        )
+
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        encoded_features = []
+        for feat in self.agent_features:
+            encoded_features.append(feat.generate(env, player_id))
+        encoding = np.hstack(encoded_features).astype(np.float32)
+        assert np.array_equal(self.shape, encoding.shape)
+        return encoding
+
+
+class ReducedRange(feature.Feature):
+    """
+    Similar to localObs but with reduced sensing range.
+    Tests performance with limited visibility of distant objects.
+    """
+
+    def __init__(self, env, **kwargs):
+        num_agents = env.config["num_agents"]
+
+        self.agent_features = [
+            features.AgentDir(),
+            overcooked_features.OvercookedInventory(),
+            overcooked_features.NextToCounter(),
+            overcooked_features.NextToPot(),
+            # Reduced n values for limited range
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.Onion, n=1),
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.Plate, n=1),
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.PlateStack, n=1),
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.OnionStack, n=1),
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.OnionSoup, n=1),
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.DeliveryZone, n=1),
+            overcooked_features.ClosestObj(focal_object_type=grid_object.Counter, n=1),
+            overcooked_features.NClosestPotFeatures(num_pots=1),  # Only closest pot
+            overcooked_features.DistToOtherPlayers(num_other_players=num_agents - 1),
+            features.AgentPosition(),
+            features.CanMoveDirection(),
+        ]
+
+        full_shape = np.sum([feat.shape for feat in self.agent_features])
+        super().__init__(
+            low=-np.inf, high=np.inf, shape=(full_shape,),
+            name="reduced_range_features", **kwargs,
+        )
+
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        encoded_features = []
+        for feat in self.agent_features:
+            encoded_features.append(feat.generate(env, player_id))
+        encoding = np.hstack(encoded_features).astype(np.float32)
+        assert np.array_equal(self.shape, encoding.shape)
+        return encoding
+
+class ExtendedRange(feature.Feature):
+    """
+    Enhanced sensing range compared to localObs.
+    Tests if more environmental information improves performance.
+    """
+
+    def __init__(self, env, **kwargs):
+        num_agents = env.config["num_agents"]
+
+        self.agent_features = [
+            features.AgentDir(),
+            overcooked_features.OvercookedInventory(),
+            overcooked_features.NextToCounter(),
+            overcooked_features.NextToPot(),
+            # Extended n values for wider range
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.Onion, n=6),
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.Plate, n=6),
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.PlateStack, n=3),
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.OnionStack, n=3),
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.OnionSoup, n=6),
+            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.DeliveryZone, n=3),
+            overcooked_features.ClosestObj(focal_object_type=grid_object.Counter, n=6),
+            overcooked_features.NClosestPotFeatures(num_pots=3),  # More pots
+            overcooked_features.DistToOtherPlayers(num_other_players=num_agents - 1),
+            features.AgentPosition(),
+            features.CanMoveDirection(),
+        ]
+
+        full_shape = np.sum([feat.shape for feat in self.agent_features])
+        super().__init__(
+            low=-np.inf, high=np.inf, shape=(full_shape,),
+            name="extended_range_features", **kwargs,
+        )
+
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        encoded_features = []
+        for feat in self.agent_features:
+            encoded_features.append(feat.generate(env, player_id))
+        encoding = np.hstack(encoded_features).astype(np.float32)
+        assert np.array_equal(self.shape, encoding.shape)
+        return encoding
 
 
 class SuccessfullyDeliveredSoup(feature.Feature):

@@ -20,10 +20,16 @@ def main():
         print("Plotting all layouts")
         running_avg_lists = []
         episode_returns_lists = []
-        folders = ['datas/data0609', 
-                   'datas/data0714_local_obs', 
-                   'datas/data0716-cramped_minimal_other_agent_aware',
-                   'datas/data0717_cramped_minimal_spatial']  # comparing partial obs and full obs
+        #folders = ['datas/data0609', 
+        #           'datas/data0714_local_obs', 
+        #           'datas/data0716-cramped_minimal_other_agent_aware',
+        #           'datas/data0717_cramped_minimal_spatial']  # comparing partial obs and full obs cramped
+        folders = [
+            'datas/data0714-force-coordination',
+            'datas/data0717_forced_foorced_local_obs',
+            'datas/data0716-forced_coord_minimal_other_agent_aware',
+            'datas/data0721_forced_coord_minimal_spatial'
+        ]
         configs = [
             'Global Observation',
             'Local Observation',
@@ -79,16 +85,16 @@ def plot_comparisons(running_avg_lists, configs=['config1', 'config2'], episode_
     if episode_returns_lists:
         for config_idx, (config, episode_returns) in enumerate(zip(configs, episode_returns_lists)):
             for seed_returns in episode_returns:
-                x_coords = [i + 1 for i in range(len(seed_returns))]
+                x_coords = [(i + 1)*16*1000*2 for i in range(len(seed_returns))]
                 plt.plot(x_coords, seed_returns, color=colors[config_idx], alpha=0.2)
     
     # Plot running averages for each configuration
     for config_idx, (config, running_avg) in enumerate(zip(configs, running_avg_lists)):
         print(f"Plotting {config} with {len(running_avg)} points")
-        x_coords = [i + 1 for i in range(len(running_avg))]
+        x_coords = [(i + 1)*16*1000*2 for i in range(len(running_avg))]
         plt.plot(x_coords, running_avg, label=config, linewidth=2, color=colors[config_idx])
     
-    plt.xlabel("Episode")
+    plt.xlabel("Steps")
     plt.ylabel("Running Average Return")
     plt.title("Running Average Returns for Different Configurations")
     plt.legend()
