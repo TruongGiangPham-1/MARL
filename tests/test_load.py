@@ -47,8 +47,8 @@ def pick_up_drop_onion(env):
 def main():
     num_agents = 2
     #layout = "overcooked_coordination_ring_v0"
-    #layout = "overcooked_forced_coordination_v0"
-    layout = "overcooked_counter_circuit_v0"
+    layout = "overcooked_forced_coordination_v0"
+    #layout = "overcooked_counter_circuit_v0"
     #layout = "overcooked_cramped_room_v0"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
     parser = argparse.ArgumentParser()

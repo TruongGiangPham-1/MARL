@@ -16,6 +16,7 @@ import torch
 import argparse
 from MAPPO import MAPPO
 from CentralizedMAPPO import CMAPPO
+from QMIX import QMIX
 from agent_environment import agent_environment_loop
 from buffer import Buffer
 from plot import plot_alg_results
@@ -152,8 +153,20 @@ def main():
 
 
     parser.add_argument('--centralised', action='store_true', default=False, help='False is decentralised, True is centralised')
+    parser.add_argument('--algorithm', type=str, default='mappo', choices=['mappo', 'cmappo', 'qmix'], help='Algorithm to use')
+    
+    # QMIX specific arguments
+    parser.add_argument('--epsilon-start', type=float, default=1.0, help='Initial epsilon for exploration')
+    parser.add_argument('--epsilon-end', type=float, default=0.05, help='Final epsilon for exploration')
+    parser.add_argument('--epsilon-decay', type=float, default=0.995, help='Epsilon decay rate')
+    parser.add_argument('--target-update-freq', type=int, default=200, help='Target network update frequency')
+    parser.add_argument('--buffer-size', type=int, default=5000, help='Experience replay buffer size')
+    parser.add_argument('--batch-size-qmix', type=int, default=32, help='Batch size for QMIX')
+    parser.add_argument('--mixing-embed-dim', type=int, default=32, help='Mixing network embedding dimension')
+    parser.add_argument('--hidden-dim', type=int, default=256, help='Hidden layer dimension')
+    
     args = parser.parse_args()
-    print(f'num_agents: {args.num_agents}, layout: {args.layout}, save_path: {args.save_path}')
+    print(f'num_agents: {args.num_agents}, layout: {args.layout}, save_path: {args.save_path}, algorithm: {args.algorithm}')
 
     batch_size = args.num_envs * args.num_agents * args.num_steps  # number of samples to collect before update
 
@@ -181,10 +194,7 @@ def main():
     # ----------------------
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    net = Agent(obs_space, action_space, num_agents=args.num_agents, num_envs=args.num_envs).to(device)
-    optimizer = torch.optim.Adam(net.parameters(), lr=args.lr, betas=(0.9, 0.95))
-    buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], args.num_envs, max_size=args.num_steps)
-
+    
     import os
     os.makedirs("logs", exist_ok=True)
     os.makedirs(os.path.join(PROJECT_ROOT, args.data_path), exist_ok=True)  # contain .csv files of returns
@@ -192,43 +202,113 @@ def main():
 
     single_agent_obs_dim = env.observation_spaces[0]['n_agent_overcooked_features'].shape  # 
     sigle_agent_action_dim = env.action_spaces[0].n  # int
-    if not args.centralised:
-        print(f'Using decentralised critic')
-        ppo_agent = MAPPO(vec_env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=batch_size,
-                          num_mini_batches=args.num_minibatches, ppo_epoch=args.ppo_epoch, clip_param=args.clip_param,
-                        value_loss_coef=args.value_loss_coef, entropy_coef=args.entropy_coef, max_grad_norm=args.max_grad_norm,
-                        gamma=args.gamma, lam=args.lam,
-                        save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log, args=args)
+    
+    # Select algorithm
+    if args.algorithm == 'qmix':
+        print('Using QMIX algorithm')
+        # For QMIX, we assume num_envs = 1 for simplicity
+        if args.num_envs != 1:
+            print(f"Warning: QMIX implementation assumes num_envs=1, but got num_envs={args.num_envs}. Setting num_envs=1.")
+            args.num_envs = 1
+            # Recreate vectorized environment with num_envs=1
+            vec_env = make_vector_env(num_envs=1, overcooked_env=env)
+            vec_env.reset()
+        
+        obs_dim = single_agent_obs_dim[0]
+        action_dim = sigle_agent_action_dim
+        state_dim = args.num_agents * obs_dim  # Use concatenated observations as global state
+        
+        # For QMIX, we don't need the batch_size calculation from PPO
+        save_path_qmix = None
+        if args.save_path:
+            save_path_qmix = os.path.join(PROJECT_ROOT, args.save_path, f"qmix_{args.num_agents}_agents_{args.layout}_seed_{args.seed}")
+        
+        agent = QMIX(
+            env=vec_env,
+            num_agents=args.num_agents,
+            obs_dim=obs_dim,
+            action_dim=action_dim,
+            state_dim=state_dim,
+            lr=args.lr,
+            gamma=args.gamma,
+            epsilon_start=args.epsilon_start,
+            epsilon_end=args.epsilon_end,
+            epsilon_decay=args.epsilon_decay,
+            target_update_freq=args.target_update_freq,
+            buffer_size=args.buffer_size,
+            batch_size=args.batch_size_qmix,
+            mixing_embed_dim=args.mixing_embed_dim,
+            hidden_dim=args.hidden_dim,
+            save_path=save_path_qmix,
+            log_dir=log_dir,
+            log=args.log,
+            args=args
+        )
+        # For QMIX, use a different update schedule
+        num_updates = args.total_steps // args.num_steps
+    elif args.algorithm == 'mappo' or (args.algorithm == 'mappo' and not args.centralised):
+        print('Using decentralised MAPPO')
+        net = Agent(obs_space, action_space, num_agents=args.num_agents, num_envs=args.num_envs).to(device)
+        optimizer = torch.optim.Adam(net.parameters(), lr=args.lr, betas=(0.9, 0.95))
+        buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], args.num_envs, max_size=args.num_steps)
+        
+        agent = MAPPO(vec_env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=batch_size,
+                      num_mini_batches=args.num_minibatches, ppo_epoch=args.ppo_epoch, clip_param=args.clip_param,
+                    value_loss_coef=args.value_loss_coef, entropy_coef=args.entropy_coef, max_grad_norm=args.max_grad_norm,
+                    gamma=args.gamma, lam=args.lam,
+                    save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log, args=args)
+        num_updates = args.total_steps // batch_size
+    elif args.algorithm == 'cmappo' or (args.algorithm == 'mappo' and args.centralised):
+        print('Using centralised MAPPO')
+        net = Agent(obs_space, action_space, num_agents=args.num_agents, num_envs=args.num_envs).to(device)
+        optimizer = torch.optim.Adam(net.parameters(), lr=args.lr, betas=(0.9, 0.95))
+        buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], args.num_envs, max_size=args.num_steps)
+        
+        agent = CMAPPO(vec_env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=batch_size,
+                       num_mini_batches=args.num_minibatches, ppo_epoch=args.ppo_epoch, clip_param=args.clip_param,
+                    value_loss_coef=args.value_loss_coef, entropy_coef=args.entropy_coef, max_grad_norm=args.max_grad_norm,
+                    gamma=args.gamma, lam=args.lam,
+                    save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log, args=args)
+        num_updates = args.total_steps // batch_size
     else:
-        print(f'Using centralised critic')
-        ppo_agent = CMAPPO(vec_env, optimizer, net, buffer, single_agent_obs_dim, sigle_agent_action_dim, batch_size=batch_size,
-                           num_mini_batches=args.num_minibatches, ppo_epoch=args.ppo_epoch, clip_param=args.clip_param,
-                        value_loss_coef=args.value_loss_coef, entropy_coef=args.entropy_coef, max_grad_norm=args.max_grad_norm,
-                        gamma=args.gamma, lam=args.lam,
-                        save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log, args=args)
-    episode_returns, freq_dict = agent_environment_loop(ppo_agent, vec_env, device, num_update=args.total_steps // batch_size, log_dir=log_dir,
+        raise ValueError(f"Unknown algorithm: {args.algorithm}")
+        
+    episode_returns, freq_dict = agent_environment_loop(agent, vec_env, device, num_update=num_updates, log_dir=log_dir,
                                                         args=args)
     print(f'episode returns {episode_returns}')
 
-    bool_to_str = lambda x: "centralised" if x else "decentralised"
+    def get_algorithm_name(args):
+        if args.algorithm == 'qmix':
+            return 'qmix'
+        elif args.algorithm == 'mappo' or args.algorithm == 'cmappo':
+            return "centralised" if args.centralised else "decentralised"
+        else:
+            return args.algorithm
+    
+    alg_name = get_algorithm_name(args)
     folder_path = os.path.join(PROJECT_ROOT, args.data_path)
 
     df = pd.DataFrame(episode_returns)
-    df.to_csv(os.path.join(folder_path, f'{bool_to_str(args.centralised)}_{args.num_agents}_{args.layout}_returns_seed_{args.seed}.csv'), index=False)
+    df.to_csv(os.path.join(folder_path, f'{alg_name}_{args.num_agents}_{args.layout}_returns_seed_{args.seed}.csv'), index=False)
 
     df = pd.DataFrame(freq_dict["frequency_delivery_per_episode"])
-    df.to_csv(os.path.join(folder_path, f'{bool_to_str(args.centralised)}_{args.num_agents}_{args.layout}_frequency_delivery_per_episode_seed_{args.seed}.csv'), index=False)
+    df.to_csv(os.path.join(folder_path, f'{alg_name}_{args.num_agents}_{args.layout}_frequency_delivery_per_episode_seed_{args.seed}.csv'), index=False)
 
     df = pd.DataFrame(freq_dict["frequency_plated_per_episode"])
-    df.to_csv(os.path.join(folder_path, f'{bool_to_str(args.centralised)}_{args.num_agents}_{args.layout}_frequency_plated_per_episode_seed_{args.seed}.csv'), index=False)
+    df.to_csv(os.path.join(folder_path, f'{alg_name}_{args.num_agents}_{args.layout}_frequency_plated_per_episode_seed_{args.seed}.csv'), index=False)
 
     df = pd.DataFrame(freq_dict["frequency_ingredient_in_pot_per_episode"])
-    df.to_csv(os.path.join(folder_path, f'{bool_to_str(args.centralised)}_{args.num_agents}_{args.layout}_frequency_ingredient_in_pot_per_episode_seed_{args.seed}.csv'), index=False)
+    df.to_csv(os.path.join(folder_path, f'{alg_name}_{args.num_agents}_{args.layout}_frequency_ingredient_in_pot_per_episode_seed_{args.seed}.csv'), index=False)
 
     # save args to file
-    with open(os.path.join(folder_path, f'{bool_to_str(args.centralised)}_{args.num_agents}_{args.layout}_args_seed_{args.seed}.txt'), 'w') as f:
+    with open(os.path.join(folder_path, f'{alg_name}_{args.num_agents}_{args.layout}_args_seed_{args.seed}.txt'), 'w') as f:
         for arg in vars(args):
             f.write(f"{arg}: {getattr(args, arg)}\n")
+    
+    # Save model if requested
+    if args.save and hasattr(agent, 'save_model'):
+        agent.save_model()
+        
     return
     
 if __name__ == "__main__":
