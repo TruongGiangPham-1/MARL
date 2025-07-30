@@ -21,28 +21,28 @@ debug:
 # QMIX targets
 qmix-cramped:
 	python3 main.py --algorithm qmix --save-path models --num-agents 2 --num-envs 1 --layout overcooked_cramped_room_v0 \
-	--total-steps 1000000 --seed 1 --lr 5e-4 --gamma 0.99 --data-path data \
-	--epsilon-start 1.0 --epsilon-end 0.05 --epsilon-decay 0.995 --target-update-freq 200 \
-	--buffer-size 10000 --batch-size-qmix 32 --mixing-embed-dim 32 --hidden-dim 256 \
-	--feature Minimal_spatial_other_agent_aware --save --log
+	--num-episodes 5000 --seed 1 --lr 5e-4 --gamma 0.99 --data-path data \
+	--epsilon-start 1.0 --epsilon-end 0.05 --epsilon-decay 0.70 --target-update-freq 200 \
+	--buffer-size 1000000 --batch-size-qmix 32 --mixing-embed-dim 32 --hidden-dim 256 \
+	--feature global_obs --save --log
 
 qmix-forced:
 	python3 main.py --algorithm qmix --save-path models --num-agents 2 --num-envs 1 --layout overcooked_forced_coordination_v0 \
-	--total-steps 1000000 --seed 1 --lr 5e-4 --gamma 0.99 --data-path data \
+	--num-episodes 5000 --seed 1 --lr 5e-4 --gamma 0.99 --data-path data \
 	--epsilon-start 1.0 --epsilon-end 0.05 --epsilon-decay 0.995 --target-update-freq 200 \
 	--buffer-size 10000 --batch-size-qmix 32 --mixing-embed-dim 32 --hidden-dim 256 \
 	--feature Minimal_spatial --save --log
 
 qmix-large:
 	python3 main.py --algorithm qmix --save-path models --num-agents 4 --num-envs 1 --layout large_overcooked_layout \
-	--total-steps 2000000 --seed 1 --lr 5e-4 --gamma 0.99 --data-path data \
+	--num-episodes 8000 --seed 1 --lr 5e-4 --gamma 0.99 --data-path data \
 	--epsilon-start 1.0 --epsilon-end 0.05 --epsilon-decay 0.9995 --target-update-freq 300 \
 	--buffer-size 15000 --batch-size-qmix 64 --mixing-embed-dim 64 --hidden-dim 512 \
 	--feature global_obs --save --log
 
 qmix-debug:
 	CUDA_LAUNCH_BLOCKING=1 python3 main.py --algorithm qmix --save-path models --num-agents 2 --num-envs 1 \
-	--layout overcooked_cramped_room_v0 --total-steps 10000 --seed 1 --lr 1e-3 --gamma 0.99 \
+	--layout overcooked_cramped_room_v0 --num-episodes 100 --seed 1 --lr 1e-3 --gamma 0.99 \
 	--epsilon-start 1.0 --epsilon-end 0.1 --epsilon-decay 0.99 --target-update-freq 50 \
 	--buffer-size 1000 --batch-size-qmix 16 --mixing-embed-dim 16 --hidden-dim 128 \
 	--feature global_obs --log

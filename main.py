@@ -17,7 +17,7 @@ import argparse
 from MAPPO import MAPPO
 from CentralizedMAPPO import CMAPPO
 from QMIX import QMIX
-from agent_environment import agent_environment_loop
+from agent_environment import agent_environment_loop, qmix_environment_loop
 from buffer import Buffer
 from plot import plot_alg_results
 import pandas as pd
@@ -164,6 +164,7 @@ def main():
     parser.add_argument('--batch-size-qmix', type=int, default=32, help='Batch size for QMIX')
     parser.add_argument('--mixing-embed-dim', type=int, default=32, help='Mixing network embedding dimension')
     parser.add_argument('--hidden-dim', type=int, default=256, help='Hidden layer dimension')
+    parser.add_argument('--num-episodes', type=int, default=1000, help='Number of episodes for QMIX training')
     
     args = parser.parse_args()
     print(f'num_agents: {args.num_agents}, layout: {args.layout}, save_path: {args.save_path}, algorithm: {args.algorithm}')
@@ -244,8 +245,6 @@ def main():
             log=args.log,
             args=args
         )
-        # For QMIX, use a different update schedule
-        num_updates = args.total_steps // args.num_steps
     elif args.algorithm == 'mappo' or (args.algorithm == 'mappo' and not args.centralised):
         print('Using decentralised MAPPO')
         net = Agent(obs_space, action_space, num_agents=args.num_agents, num_envs=args.num_envs).to(device)
@@ -272,9 +271,15 @@ def main():
         num_updates = args.total_steps // batch_size
     else:
         raise ValueError(f"Unknown algorithm: {args.algorithm}")
+    
+    # Use appropriate environment loop based on algorithm
+    if args.algorithm == 'qmix':
+        # QMIX uses episode-based learning
+        episode_returns, freq_dict = qmix_environment_loop(agent, vec_env, device, num_episodes=args.num_episodes, log_dir=log_dir, args=args)
+    else:
+        # MAPPO/CMAPPO use step-based learning
+        episode_returns, freq_dict = agent_environment_loop(agent, vec_env, device, num_update=num_updates, log_dir=log_dir, args=args)
         
-    episode_returns, freq_dict = agent_environment_loop(agent, vec_env, device, num_update=num_updates, log_dir=log_dir,
-                                                        args=args)
     print(f'episode returns {episode_returns}')
 
     def get_algorithm_name(args):

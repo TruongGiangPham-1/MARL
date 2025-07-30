@@ -13,6 +13,7 @@ import argparse
 # Import the main function components
 from main import make_env, make_vector_env
 from QMIX import QMIX
+from agent_environment import qmix_environment_loop
 
 def test_qmix_integration():
     """Test QMIX with actual Overcooked environment"""
