@@ -167,7 +167,7 @@ def qmix_environment_loop(agent, env, device, num_episodes=1000, log_dir=None, a
         
         while not done and step_count < max_steps_per_episode:
             # Select actions using QMIX
-            actions, _, _, _ = agent.act(obs, training=True)
+            actions, _, _, _ = agent.act(obs, state=None, training=True)
             
             # Environment step
             next_obs, rewards, terminated, truncated, info = env.step(actions.cpu().numpy())

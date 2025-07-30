@@ -86,15 +86,14 @@ class MixingNetwork(nn.Module):
 
 class QMixBuffer:
     """Experience replay buffer for QMIX"""
-    def __init__(self, capacity, num_agents, obs_dim, state_dim):
+    def __init__(self, capacity, num_agents, obs_dim):
         self.capacity = capacity
         self.num_agents = num_agents
         self.obs_dim = obs_dim
-        self.state_dim = state_dim
         
         self.buffer = deque(maxlen=capacity)
         
-    def add(self, obs, actions, rewards, next_obs, dones, state, next_state):
+    def add(self, obs, actions, rewards, next_obs, dones):
         """
         Args:
             obs: [num_agents, obs_dim]
@@ -102,17 +101,15 @@ class QMixBuffer:
             rewards: [num_agents]
             next_obs: [num_agents, obs_dim]
             dones: [num_agents]
-            state: [state_dim] - global state
-            next_state: [state_dim] - next global state
         """
-        experience = (obs, actions, rewards, next_obs, dones, state, next_state)
+        experience = (obs, actions, rewards, next_obs, dones)
         self.buffer.append(experience)
     
     def sample(self, batch_size):
         """Sample a batch of experiences"""
         batch = random.sample(self.buffer, batch_size)
         
-        obs, actions, rewards, next_obs, dones, states, next_states = zip(*batch)
+        obs, actions, rewards, next_obs, dones = zip(*batch)
         
         # Convert to tensors
         obs = torch.stack(obs)  # [batch_size, num_agents, obs_dim]
@@ -120,10 +117,8 @@ class QMixBuffer:
         rewards = torch.stack(rewards)  # [batch_size, num_agents]
         next_obs = torch.stack(next_obs)  # [batch_size, num_agents, obs_dim]
         dones = torch.stack(dones)  # [batch_size, num_agents]
-        states = torch.stack(states)  # [batch_size, state_dim]
-        next_states = torch.stack(next_states)  # [batch_size, state_dim]
         
-        return obs, actions, rewards, next_obs, dones, states, next_states
+        return obs, actions, rewards, next_obs, dones
     
     def __len__(self):
         return len(self.buffer)
@@ -175,7 +170,7 @@ class QMIX:
         self.mixing_optimizer = torch.optim.Adam(self.mixing_network.parameters(), lr=lr)
         
         # Experience replay buffer
-        self.buffer = QMixBuffer(buffer_size, num_agents, obs_dim, state_dim)
+        self.buffer = QMixBuffer(buffer_size, num_agents, obs_dim)
         
         # Logging
         self.save_path = save_path
@@ -243,19 +238,13 @@ class QMIX:
             dones = self.current_dones  # [num_agents]
             next_obs_reshaped = next_obs  # [num_agents, obs_dim]
             
-            # Use concatenated observations as global state
-            state = obs.view(-1)  # [num_agents * obs_dim]
-            next_state = next_obs_reshaped.view(-1)  # [num_agents * obs_dim]
-            
-            # Add experience to buffer
+            # Add experience to buffer (state is computed from obs in buffer.sample())
             self.buffer.add(
                 obs.cpu(),
                 actions.cpu(),
                 rewards.cpu(),
                 next_obs_reshaped.cpu(),
-                dones.cpu(),
-                state.cpu(),
-                next_state.cpu()
+                dones.cpu()
             )
         
         # Update networks if we have enough samples
@@ -274,15 +263,17 @@ class QMIX:
     def _update_networks(self):
         """Update Q-networks and mixing network"""
         # Sample batch from buffer
-        obs, actions, rewards, next_obs, dones, states, next_states = self.buffer.sample(self.batch_size)
+        obs, actions, rewards, next_obs, dones = self.buffer.sample(self.batch_size)
         
         obs = obs.to(self.device)
         actions = actions.to(self.device)
         rewards = rewards.to(self.device)
         next_obs = next_obs.to(self.device)
         dones = dones.to(self.device)
-        states = states.to(self.device)
-        next_states = next_states.to(self.device)
+        
+        # Compute global states from observations (flattened obs)
+        states = obs.view(obs.size(0), -1)  # [batch_size, num_agents * obs_dim]
+        next_states = next_obs.view(next_obs.size(0), -1)  # [batch_size, num_agents * obs_dim]
         
         # Compute current Q-values
         current_q_values = []
