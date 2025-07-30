@@ -148,26 +148,21 @@ class QMIX:
         self.target_update_freq = target_update_freq
         self.batch_size = batch_size
         
-        # Networks
-        self.q_networks = []
-        self.target_q_networks = []
-        
-        for i in range(num_agents):
-            q_net = QNetwork(obs_dim, action_dim, hidden_dim).to(self.device)
-            target_q_net = QNetwork(obs_dim, action_dim, hidden_dim).to(self.device)
-            target_q_net.load_state_dict(q_net.state_dict())
-            
-            self.q_networks.append(q_net)
-            self.target_q_networks.append(target_q_net)
+        # Shared Q-network for all agents
+        self.q_network = QNetwork(obs_dim, action_dim, hidden_dim).to(self.device)
+        self.target_q_network = QNetwork(obs_dim, action_dim, hidden_dim).to(self.device)
+        self.target_q_network.load_state_dict(self.q_network.state_dict())
         
         # Mixing networks
         self.mixing_network = MixingNetwork(num_agents, state_dim, mixing_embed_dim).to(self.device)
         self.target_mixing_network = MixingNetwork(num_agents, state_dim, mixing_embed_dim).to(self.device)
         self.target_mixing_network.load_state_dict(self.mixing_network.state_dict())
         
-        # Optimizers
-        self.q_optimizers = [torch.optim.Adam(q_net.parameters(), lr=lr) for q_net in self.q_networks]
-        self.mixing_optimizer = torch.optim.Adam(self.mixing_network.parameters(), lr=lr)
+        # Optimizers (now just one for shared network + mixing network)
+        self.optimizer = torch.optim.Adam(
+            list(self.q_network.parameters()) + list(self.mixing_network.parameters()), 
+            lr=lr
+        )
         
         # Experience replay buffer
         self.buffer = QMixBuffer(buffer_size, num_agents, obs_dim)
@@ -204,17 +199,18 @@ class QMIX:
             raise ValueError(f"Expected obs shape [{self.num_agents}, obs_dim], got {obs.shape}")
     
     def _get_actions_single_env(self, obs, training=True):
-        """Get actions for a single environment"""
+        """Get actions for a single environment using shared network"""
         with torch.no_grad():
+            # Process all agents at once with shared network
+            obs_batch = obs.to(self.device)  # [num_agents, obs_dim]
+            q_values = self.q_network(obs_batch)  # [num_agents, action_dim]
+            
             actions = []
-            for i, q_net in enumerate(self.q_networks):
-                agent_obs = obs[i].unsqueeze(0).to(self.device)  # [1, obs_dim]
-                q_values = q_net(agent_obs)  # [1, action_dim]
-                
+            for i in range(self.num_agents):
                 if training and random.random() < self.epsilon:
                     action = torch.randint(0, self.action_dim, (1,)).to(self.device)
                 else:
-                    action = q_values.argmax(dim=1)
+                    action = q_values[i].argmax(dim=0)  # Get action for agent i
                 
                 actions.append(action.item())
             
@@ -275,27 +271,23 @@ class QMIX:
         states = obs.view(obs.size(0), -1)  # [batch_size, num_agents * obs_dim]
         next_states = next_obs.view(next_obs.size(0), -1)  # [batch_size, num_agents * obs_dim]
         
-        # Compute current Q-values
-        current_q_values = []
-        for i, q_net in enumerate(self.q_networks):
-            agent_obs = obs[:, i, :]  # [batch_size, obs_dim]
-            q_vals = q_net(agent_obs)  # [batch_size, action_dim]
-            agent_actions = actions[:, i].long().unsqueeze(1)  # [batch_size, 1]
-            current_q = q_vals.gather(1, agent_actions).squeeze(1)  # [batch_size]
-            current_q_values.append(current_q)
+        # Compute current Q-values using shared network
+        obs_flat = obs.view(-1, self.obs_dim)  # [batch_size * num_agents, obs_dim]
+        q_vals_flat = self.q_network(obs_flat)  # [batch_size * num_agents, action_dim]
+        q_vals = q_vals_flat.view(obs.size(0), self.num_agents, -1)  # [batch_size, num_agents, action_dim]
         
-        current_q_values = torch.stack(current_q_values, dim=1)  # [batch_size, num_agents]
+        # Get Q-values for chosen actions
+        actions_expanded = actions.unsqueeze(-1)  # [batch_size, num_agents, 1]
+        current_q_values = q_vals.gather(2, actions_expanded).squeeze(-1)  # [batch_size, num_agents]
         
-        # Compute target Q-values
+        # Compute target Q-values using shared target network
         with torch.no_grad():
-            next_q_values = []
-            for i, target_q_net in enumerate(self.target_q_networks):
-                agent_next_obs = next_obs[:, i, :]  # [batch_size, obs_dim]
-                next_q_vals = target_q_net(agent_next_obs)  # [batch_size, action_dim]
-                max_next_q = next_q_vals.max(1)[0]  # [batch_size]
-                next_q_values.append(max_next_q)
+            next_obs_flat = next_obs.view(-1, self.obs_dim)  # [batch_size * num_agents, obs_dim]
+            next_q_vals_flat = self.target_q_network(next_obs_flat)  # [batch_size * num_agents, action_dim]
+            next_q_vals = next_q_vals_flat.view(next_obs.size(0), self.num_agents, -1)  # [batch_size, num_agents, action_dim]
             
-            next_q_values = torch.stack(next_q_values, dim=1)  # [batch_size, num_agents]
+            # Get max Q-values for next state
+            next_q_values = next_q_vals.max(2)[0]  # [batch_size, num_agents]
             
             # Mix target Q-values
             target_q_tot = self.target_mixing_network(next_q_values, next_states)  # [batch_size, 1]
@@ -313,21 +305,15 @@ class QMIX:
         # Compute loss
         loss = F.mse_loss(current_q_tot, targets)
         
-        # Update all networks
-        for optimizer in self.q_optimizers:
-            optimizer.zero_grad()
-        self.mixing_optimizer.zero_grad()
-        
+        # Update shared network and mixing network
+        self.optimizer.zero_grad()
         loss.backward()
         
         # Gradient clipping
-        for q_net in self.q_networks:
-            torch.nn.utils.clip_grad_norm_(q_net.parameters(), 10.0)
+        torch.nn.utils.clip_grad_norm_(self.q_network.parameters(), 10.0)
         torch.nn.utils.clip_grad_norm_(self.mixing_network.parameters(), 10.0)
         
-        for optimizer in self.q_optimizers:
-            optimizer.step()
-        self.mixing_optimizer.step()
+        self.optimizer.step()
         
         # Logging
         if self.log and self.summary_writer:
@@ -337,8 +323,7 @@ class QMIX:
     
     def _update_target_networks(self):
         """Update target networks"""
-        for i in range(self.num_agents):
-            self.target_q_networks[i].load_state_dict(self.q_networks[i].state_dict())
+        self.target_q_network.load_state_dict(self.q_network.state_dict())
         self.target_mixing_network.load_state_dict(self.mixing_network.state_dict())
     
     def save_model(self):
@@ -346,9 +331,8 @@ class QMIX:
         if self.save_path:
             os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
             
-            # Save all Q-networks
-            for i, q_net in enumerate(self.q_networks):
-                torch.save(q_net.state_dict(), f"{self.save_path}_q_net_{i}.pth")
+            # Save shared Q-network
+            torch.save(self.q_network.state_dict(), f"{self.save_path}_q_net.pth")
             
             # Save mixing network
             torch.save(self.mixing_network.state_dict(), f"{self.save_path}_mixing_net.pth")
@@ -357,9 +341,8 @@ class QMIX:
     
     def load_model(self, path):
         """Load the model"""
-        for i, q_net in enumerate(self.q_networks):
-            q_net.load_state_dict(torch.load(f"{path}_q_net_{i}.pth"))
-            self.target_q_networks[i].load_state_dict(q_net.state_dict())
+        self.q_network.load_state_dict(torch.load(f"{path}_q_net.pth"))
+        self.target_q_network.load_state_dict(self.q_network.state_dict())
         
         self.mixing_network.load_state_dict(torch.load(f"{path}_mixing_net.pth"))
         self.target_mixing_network.load_state_dict(self.mixing_network.state_dict())
