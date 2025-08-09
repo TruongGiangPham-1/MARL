@@ -155,28 +155,30 @@ def qmix_environment_loop(agent, env, device, num_episodes=1000, log_dir=None, a
     for episode in tqdm(range(num_episodes)):
         obs, info = env.reset()
         obs = torch.FloatTensor(obs['n_agent_overcooked_features']).to(device)  # (num_agents, obs_dim)
+        obs = torch.clamp(obs, min=-5.0, max=5.0)  # Clip observations
         
         episode_reward = 0
         frequency_delivery_per_episode = 0
         frequency_plated_per_episode = 0
         frequency_ingredient_in_pot_per_episode = 0
         
-        done = False
+        terminated_ = False
+        truncate_ = False
         step_count = 0
-        max_steps_per_episode = args.num_steps if hasattr(args, 'num_steps') else 200
-        
-        while not done and step_count < max_steps_per_episode:
+        #max_steps_per_episode = args.num_steps if hasattr(args, 'num_steps') else 200
+
+        while not (terminated_ or truncate_):
             # Select actions using QMIX
             actions, _, _, _ = agent.act(obs, state=None, training=True)
             
             # Environment step
             next_obs, rewards, terminated, truncated, info = env.step(actions.cpu().numpy())
             next_obs = torch.FloatTensor(next_obs['n_agent_overcooked_features']).to(device)
+            next_obs = torch.clamp(next_obs, min=-5.0, max=5.0)  # Clip observations
             rewards = torch.FloatTensor(rewards).to(device)
             
             # Check for episode termination
             dones = torch.tensor([terminated[i] or truncated[i] for i in range(args.num_agents)]).to(device)
-            done = torch.any(dones).item() or step_count >= max_steps_per_episode - 1
             
             # Track specific rewards
             if torch.any(rewards >= 1):
@@ -190,6 +192,8 @@ def qmix_environment_loop(agent, env, device, num_episodes=1000, log_dir=None, a
             
             # Accumulate episode reward
             episode_reward += rewards.mean().item()
+            terminated_ = np.any(terminated)  # Check if any agent is terminated
+            truncate_ = np.any(truncated)
             
             # Store experience in QMIX buffer (values are None for QMIX)
             agent.add_to_buffer(obs, actions, rewards, dones, None, None)
@@ -304,4 +308,4 @@ def mpe_environment_loop(agent, env, device, num_episodes=1000, log_dir=None):
 """
 Problem: in MPE, 
 
-"""
+"""# loop
