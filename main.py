@@ -17,7 +17,8 @@ import argparse
 from MAPPO import MAPPO
 from CentralizedMAPPO import CMAPPO
 from QMIX import QMIX
-from agent_environment import agent_environment_loop, qmix_environment_loop
+from semi_gradient_sarsa import SemiGradientSARSA, ConstantEpsilonGreedyExploration, SarsaFeatureExtractor
+from agent_environment import agent_environment_loop, qmix_environment_loop, agent_environment_sarsa_loop
 from buffer import Buffer
 from plot import plot_alg_results
 import pandas as pd
@@ -149,7 +150,7 @@ def main():
 
 
     parser.add_argument('--centralised', action='store_true', default=False, help='False is decentralised, True is centralised')
-    parser.add_argument('--algorithm', type=str, default='mappo', choices=['mappo', 'cmappo', 'qmix'], help='Algorithm to use')
+    parser.add_argument('--algorithm', type=str, default='mappo', choices=['mappo', 'cmappo', 'qmix', 'sarsa'], help='Algorithm to use')
     
     # QMIX specific arguments
     parser.add_argument('--epsilon-start', type=float, default=1.0, help='Initial epsilon for exploration')
@@ -161,6 +162,9 @@ def main():
     parser.add_argument('--mixing-embed-dim', type=int, default=32, help='Mixing network embedding dimension')
     parser.add_argument('--hidden-dim', type=int, default=256, help='Hidden layer dimension')
     parser.add_argument('--num-episodes', type=int, default=1000, help='Number of episodes for QMIX training')
+
+    # Semi-Gradient SARSA specific arguments
+    parser.add_argument('--step-size', type=float, default=0.01, help='Step size for Semi-Gradient SARSA')
     
     args = parser.parse_args()
     print(f'num_agents: {args.num_agents}, layout: {args.layout}, save_path: {args.save_path}, algorithm: {args.algorithm}')
@@ -265,6 +269,22 @@ def main():
                     gamma=args.gamma, lam=args.lam,
                     save_path=args.save_path, log_dir=log_dir, num_agents=args.num_agents, log=args.log, args=args)
         num_updates = args.total_steps // batch_size
+    elif args.algorithm == 'sarsa':
+        print('Using Semi-Gradient SARSA algorithm')
+        if args.num_agents != 1:
+            raise ValueError("Semi-Gradient SARSA implementation only supports single agent (num_agents=1).")
+        explorer = ConstantEpsilonGreedyExploration(0.01, sigle_agent_action_dim)
+        step_size = args.step_size
+        discount = args.gamma
+        feature_extractor = SarsaFeatureExtractor(single_agent_obs_dim[0], sigle_agent_action_dim)
+        num_state_action_features = feature_extractor.size
+        agent = SemiGradientSARSA(num_state_action_features,
+                                  sigle_agent_action_dim,
+                                  feature_extractor,
+                                  step_size,
+                                  explorer,
+                                  discount,
+                                  initial_weight_value=0.0, n=5)
     else:
         raise ValueError(f"Unknown algorithm: {args.algorithm}")
     
@@ -272,6 +292,10 @@ def main():
     if args.algorithm == 'qmix':
         # QMIX uses episode-based learning
         episode_returns, freq_dict = qmix_environment_loop(agent, vec_env, device, num_episodes=args.num_episodes, log_dir=log_dir, args=args)
+    elif args.algorithm == 'sarsa':
+        # Semi-Gradient SARSA uses step-based learning
+        num_episode = args.total_steps // 1000  # assuming average episode length of 1000 steps
+        episode_returns, freq_dict = agent_environment_sarsa_loop(agent, vec_env, num_episodes=num_episode, log_dir=log_dir)
     else:
         # MAPPO/CMAPPO use step-based learning
         episode_returns, freq_dict = agent_environment_loop(agent, vec_env, device, num_update=num_updates, log_dir=log_dir, args=args)
