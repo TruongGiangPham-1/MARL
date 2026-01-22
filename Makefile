@@ -52,6 +52,9 @@ sarsa:
 	--total-steps 1000000 --seed 1 --step-size 0.01 --data-path data \
 	--feature local_obs
 
+freeze:
+	python3 freeze_CNN_RL.py --model-path models/decentralised_policy_2_agents_overcooked_cramped_room_v0_seed_2.pth --layout overcooked_cramped_room_v0 --episodes 100
+
 # Test QMIX implementation
 test-qmix:
 	python3 tests/test_qmix.py

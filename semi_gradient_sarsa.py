@@ -23,6 +23,41 @@ class ConstantEpsilonGreedyExploration:
             # Exploit: choose best action (break ties randomly)
             return np.random.choice(np.flatnonzero(action_values == action_values.max()))
 
+class NNEpsilonGreedyExplorer:
+    def __init__(self, num_actions, epsilon_start=1.0, epsilon_end=0.05, decay_steps=10000):
+        self.num_actions = num_actions
+        self.epsilon = epsilon_start
+        self.epsilon_start = epsilon_start
+        self.epsilon_end = epsilon_end
+        self.decay_steps = decay_steps
+        self.current_step = 0
+
+    def act(self, agent, state, device="cpu"):
+        """Selects an action using epsilon-greedy logic."""
+        self.current_step += 1
+        
+        # 1. Update epsilon (linear decay)
+        self.epsilon = max(
+            self.epsilon_end, 
+            self.epsilon_start - (self.current_step / self.decay_steps) * (self.epsilon_start - self.epsilon_end)
+        )
+
+        # 2. Explore: Choose random action
+        if np.random.rand() < self.epsilon:
+            return np.random.randint(self.num_actions)
+
+        # 3. Exploit: Choose action with highest Q-value
+        # We use torch.no_grad() because we aren't training during action selection
+        with torch.no_grad():
+            # Forward pass through frozen network + trainable actor
+            features = agent.network(state)
+            q_values = agent.actor(features)  # (n, 7)
+            # Get index of the maximum Q-value
+            action = torch.argmax(q_values, dim=1).item()
+            print(f"computed actions {action} with q_values {q_values.cpu().numpy()}")
+            
+        return action
+
 class SarsaFeatureExtractor:
     """Class that implements feature extraction for SARSA."""
 
@@ -86,8 +121,9 @@ def get_action_values(obs, feature_extractor, weights, num_actions):
 
 
 class SemiGradientSARSA_NN:
-    def __init__(self, agent, step_size, discount, n):
+    def __init__(self, agent, explorer, step_size, discount, n):
         self.agent = agent
+        self.explorer = explorer
         self.discount = discount
         self.n = n
 
@@ -96,6 +132,7 @@ class SemiGradientSARSA_NN:
         self.optimizer = torch.optim.Adam(self.agent.actor.parameters(), lr=step_size)
         # 3. Trajectory buffer to store (s, a, r)
         self.buffer = deque(maxlen=n)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     def get_features(self, state):
         """Passes state through the FROZEN CNN base."""
@@ -105,11 +142,11 @@ class SemiGradientSARSA_NN:
         return features
     
     def act(self, state):
-        feature = self.get_features(state)
-        
+        print(f"reached here")
+        action = self.explorer.act(self.agent, state)
+        print(f"acafdafaf")
         # argmax
-        
-        # epislon greey
+        return action
 
     def update(self, state, action, reward, next_state, next_action, done):
         self.buffer.append((state, action, reward))
@@ -124,33 +161,29 @@ class SemiGradientSARSA_NN:
         # G = R_t + γR_{t+1} + ... + γ^{n-1}R_{t+n-1}
         G = 0
         for i, (_, _, r) in enumerate(self.buffer):
-            G += (self.gamma ** i) * r
+            G += (self.discount ** i) * r
 
         if not done:
             with torch.no_grad():
                 next_features = self.get_features(next_state)
-                next_q_values = self.agent.actor(next_features)
-                next_q = next_q_values[next_action]
-                G += (self.gamma ** m) * next_q
+                next_q_values = self.agent.actor(next_features)  # (n, 7)
+                next_q = next_q_values[0, next_action]  # (TODO: in future, extend to MARL)
+                G += (self.discount ** m) * next_q
         # 3. Perform the Semi-gradient update on the EARLIEST state in the buffer
         # We are updating the weights based on the state/action from 'm' steps ago
         state_0, action_0, _ = self.buffer[0]
         
         # Get features (no grad for CNN) and Q-value (with grad for Linear head)
-        features_0 = self.get_features(state_0)
-        current_q = self.agent.actor(features_0)[action_0]
+        features_0 = self.get_features(state_0)  # (1, 256)
+        current_q = self.agent.actor(features_0)[0, action_0]
         
         # Loss = (Target - Current_Q)^2
         # G is treated as a constant (Semi-gradient)
-        loss = torch.functional.nn.mse_loss(current_q, torch.tensor(G, device=self.device))
+        loss = torch.nn.functional.mse_loss(current_q, torch.tensor(G, device=self.device))
 
         self.optimizer.zero_grad()
         loss.backward()
-        self.optimizer.step()
-    
-    def act(self, obs):
-
-        return
+        #self.optimizer.step()
 
 class SemiGradientSARSA:
     """Class that implements Linear Semi-gradient SARSA."""

@@ -7,7 +7,7 @@ import numpy as np
 from buffer import Buffer
 from main import make_env
 from MAPPO import MAPPO
-from semi_gradient_sarsa import SemiGradientSARSA_NN
+from semi_gradient_sarsa import SemiGradientSARSA_NN, NNEpsilonGreedyExplorer
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class FrozenNeuralExtractor:
@@ -34,6 +34,9 @@ def main():
         default="models/policy.pth",
         help="Path to the trained model",
     )
+    parser.add_argument("--episodes", type=int, default=100, help="Number of episodes to run")
+    parser.add_argument("--layout", type=str, default="overcooked_cramped_room_v0", help="Layout of the Overcooked environment")
+
     num_agents = 2
     args = parser.parse_args()
     obs_space = gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=(202,), dtype=np.float32)
@@ -71,13 +74,41 @@ def main():
 
     feature_extractor = FrozenNeuralExtractor(nn)
     num_state_action_features = 256
+    explorer = NNEpsilonGreedyExplorer(num_actions=action_space.n, epsilon_start=0.0, epsilon_end=0.0, decay_steps=10000)
     agent = SemiGradientSARSA_NN(
         agent=nn,
+        explorer=explorer,
         step_size=0.01,
         discount=0.99,
         n=3
     )
     obs = torch.stack([   torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(num_agents)], dim=0).to(device)  # (1, 202)
+    # TD loop
+    for episode in range(args.episodes):
+        done = False
+        obs, info = env.reset()
+        obs = torch.stack([   torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(num_agents)], dim=0).to(device)  # (1, 202)
+        state = obs
+        action = agent.act(state)
+        print(f"action received {action}")
+        while not done:
+            env_action = {0: action, 1: 6}  # other agent does no-op
+            next_obs, rewards, terminated, truncated, info = env.step(env_action)
+            env.render()
+            next_state = torch.stack([   torch.FloatTensor(next_obs[i]['n_agent_overcooked_features']) for i in range(num_agents)], dim=0).to(device)
+            reward = rewards[0]
+            done = terminated[0] or truncated[0]
+            next_action = agent.act(next_state) if not done else None
+
+            # Update the agent
+            agent.update(state, action, reward, next_state, next_action, done)
+
+            state = next_state
+            action = next_action
+            print(f"Episode {episode+1}, Reward: {reward}, Done: {done}")
+
+
+
     #while True:
     #    obs = torch.stack([   torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(num_agents)], dim=0).to(device)
     #    actions, _, _, _ = mappo.act(obs)  # actions is a tensor of shape (num_agents,)
