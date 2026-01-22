@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 from collections import deque
+from torch.utils.tensorboard import SummaryWriter
+from torch.distributions.categorical import Categorical
 
 class ConstantEpsilonGreedyExploration:
     """Epsilon-greedy with constant epsilon.
@@ -53,10 +55,12 @@ class NNEpsilonGreedyExplorer:
             features = agent.network(state)
             q_values = agent.actor(features)  # (n, 7)
             # Get index of the maximum Q-value
-            action = torch.argmax(q_values, dim=1).item()
-            print(f"computed actions {action} with q_values {q_values.cpu().numpy()}")
+            action_argmax = torch.argmax(q_values, dim=1).item()
+            #probs = Categorical(logits=q_values)
+            #action = probs.sample()
+            #print(f"q_values {q_values.cpu().numpy()}, sample {action} argmax action {action_argmax}", )
             
-        return action
+        return action_argmax
 
 class SarsaFeatureExtractor:
     """Class that implements feature extraction for SARSA."""
@@ -121,11 +125,13 @@ def get_action_values(obs, feature_extractor, weights, num_actions):
 
 
 class SemiGradientSARSA_NN:
-    def __init__(self, agent, explorer, step_size, discount, n):
+    def __init__(self, agent, explorer, step_size, discount, n, log_dir):
         self.agent = agent
         self.explorer = explorer
         self.discount = discount
         self.n = n
+        self.log_dir = log_dir  # whether to log or not
+        self.num_gradient_steps = 0
 
         # assume that neccesary weights are frozen.            
         # Only optimize the actor (the linear head)
@@ -133,6 +139,8 @@ class SemiGradientSARSA_NN:
         # 3. Trajectory buffer to store (s, a, r)
         self.buffer = deque(maxlen=n)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if log_dir is not None:
+            self.summary_writer = SummaryWriter(log_dir=log_dir)
     
     def get_features(self, state):
         """Passes state through the FROZEN CNN base."""
@@ -142,9 +150,7 @@ class SemiGradientSARSA_NN:
         return features
     
     def act(self, state):
-        print(f"reached here")
         action = self.explorer.act(self.agent, state)
-        print(f"acafdafaf")
         # argmax
         return action
 
@@ -180,10 +186,14 @@ class SemiGradientSARSA_NN:
         # Loss = (Target - Current_Q)^2
         # G is treated as a constant (Semi-gradient)
         loss = torch.nn.functional.mse_loss(current_q, torch.tensor(G, device=self.device))
+        if self.log_dir is not None:
+            self.summary_writer.add_scalar("charts/loss", loss.item(), self.num_gradient_steps)
+            self.summary_writer.add_scalar("charts/epsilon", self.explorer.epsilon, self.explorer.current_step)
 
         self.optimizer.zero_grad()
         loss.backward()
-        #self.optimizer.step()
+        self.optimizer.step()
+        self.num_gradient_steps += 1
 
 class SemiGradientSARSA:
     """Class that implements Linear Semi-gradient SARSA."""
