@@ -1,4 +1,6 @@
 import numpy as np
+import torch
+from collections import deque
 
 class ConstantEpsilonGreedyExploration:
     """Epsilon-greedy with constant epsilon.
@@ -81,6 +83,74 @@ def get_action_values(obs, feature_extractor, weights, num_actions):
     for action in range(num_actions):
         action_values[action] = compute_q_values(feature_extractor(obs, action), weights)
     return action_values
+
+
+class SemiGradientSARSA_NN:
+    def __init__(self, agent, step_size, discount, n):
+        self.agent = agent
+        self.discount = discount
+        self.n = n
+
+        # assume that neccesary weights are frozen.            
+        # Only optimize the actor (the linear head)
+        self.optimizer = torch.optim.Adam(self.agent.actor.parameters(), lr=step_size)
+        # 3. Trajectory buffer to store (s, a, r)
+        self.buffer = deque(maxlen=n)
+    
+    def get_features(self, state):
+        """Passes state through the FROZEN CNN base."""
+        #state_t = torch.as_tensor(state, dtype=torch.float32, device=self.device)
+        with torch.no_grad():
+            features = self.agent.network(state)
+        return features
+    
+    def act(self, state):
+        feature = self.get_features(state)
+        
+        # argmax
+        
+        # epislon greey
+
+    def update(self, state, action, reward, next_state, next_action, done):
+        self.buffer.append((state, action, reward))
+        # We can only update if the buffer is full OR the episode ended
+        if len(self.buffer) < self.n and not done:
+            return None
+        
+        # Determine how many steps we are actually looking ahead (m)
+        m = len(self.buffer)
+        
+        # 1. Calculate the discounted sum of rewards in the buffer
+        # G = R_t + γR_{t+1} + ... + γ^{n-1}R_{t+n-1}
+        G = 0
+        for i, (_, _, r) in enumerate(self.buffer):
+            G += (self.gamma ** i) * r
+
+        if not done:
+            with torch.no_grad():
+                next_features = self.get_features(next_state)
+                next_q_values = self.agent.actor(next_features)
+                next_q = next_q_values[next_action]
+                G += (self.gamma ** m) * next_q
+        # 3. Perform the Semi-gradient update on the EARLIEST state in the buffer
+        # We are updating the weights based on the state/action from 'm' steps ago
+        state_0, action_0, _ = self.buffer[0]
+        
+        # Get features (no grad for CNN) and Q-value (with grad for Linear head)
+        features_0 = self.get_features(state_0)
+        current_q = self.agent.actor(features_0)[action_0]
+        
+        # Loss = (Target - Current_Q)^2
+        # G is treated as a constant (Semi-gradient)
+        loss = torch.functional.nn.mse_loss(current_q, torch.tensor(G, device=self.device))
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+    
+    def act(self, obs):
+
+        return
 
 class SemiGradientSARSA:
     """Class that implements Linear Semi-gradient SARSA."""
