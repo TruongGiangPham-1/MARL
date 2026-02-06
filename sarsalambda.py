@@ -33,7 +33,11 @@ class SarsaLambdaTileCoder:
         for a in range(self.num_actions):
             f = extract_func(obs, a, iht, self.num_features)
             qs.append(self.get_q(f))
-        return np.argmax(qs)
+        
+        # Greedy selection with tie-breaking
+        max_q = np.max(qs)
+        ties = np.flatnonzero(np.abs(qs - max_q) < 1e-8)
+        return np.random.choice(ties)
 
     def learn(self, f, r, f_next, done):
         q_curr = self.get_q(f)
@@ -100,7 +104,7 @@ def main():
             next_action = agent.choose_action(next_obs, iht, overcooked_extract_func)
             #f_next = extract_state_action_features(next_obs, next_action, iht, num_features)
             f_next = overcooked_extract_func(next_obs, next_action, iht, num_features)
-            
+            print(f"Episode {episode}, Reward: {reward}, Done: {done}, Action: {action}, Next Action: {next_action}") 
             # 4. Step the agent
             agent.learn(f, reward, f_next, done)
             
