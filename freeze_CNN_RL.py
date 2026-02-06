@@ -1,5 +1,5 @@
 import time
-from model import Agent
+from model import Agent, AgentDecentralized
 import gymnasium as gym
 import argparse
 import torch
@@ -49,14 +49,14 @@ def main():
     parser.add_argument("--episodes", type=int, default=100, help="Number of episodes to run")
     parser.add_argument("--layout", type=str, default="overcooked_cramped_room_v0", help="Layout of the Overcooked environment")
 
-    num_agents = 2
+    num_agents = 1
     args = parser.parse_args()
-    obs_space = gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=(202,), dtype=np.float32)
+    obs_space = gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=(101,), dtype=np.float32)
     action_space = gym.spaces.Discrete(7)
 
-    env = make_env(num_agents=2, layout="overcooked_cramped_room_v0", feature="global_obs", render_mode=None)
-    nn = Agent(obs_space, action_space, num_agents=2, num_envs=16).to(device)
-    buffer = Buffer(obs_space.shape[0], 2, 1, max_size=256)
+    env = make_env(num_agents=1, layout="overcooked_cramped_room_v0", feature="global_obs", render_mode="human")
+    nn = AgentDecentralized(obs_space, action_space, num_agents=1, num_envs=16).to(device)
+    buffer = Buffer(obs_space.shape[0], 1, 1, max_size=256)
     mappo = MAPPO(env, None, nn, None, None, None, num_agents=num_agents)  # THE RL AGENT
 
     # Load the trained model
@@ -68,8 +68,8 @@ def main():
         param.requires_grad = False
 
     #2. (Optional) If you also want to freeze the centralized critic
-    for param in nn.centralised_critics.parameters():
-        param.requires_grad = False
+    #for param in nn.centralised_critics.parameters():
+    #    param.requires_grad = False
     
     # 3. Reinitialize the actor and critic heads
     reinitialize_head(nn.actor)
@@ -87,70 +87,71 @@ def main():
 
     obs, info = env.reset()
     num_agents = 1
-    log_dir = "logs"
-    summaries_writer = SummaryWriter(log_dir)
-    feature_extractor = FrozenNeuralExtractor(nn)
-    num_state_action_features = 256
-    explorer = NNEpsilonGreedyExplorer(num_actions=action_space.n, epsilon_start=0.1, epsilon_end=0.1, decay_steps=10000)
-    agent = SemiGradientSARSA_NN(
-        agent=nn,
-        explorer=explorer,
-        step_size=0.01,
-        discount=0.99,
-        n=3,
-        log_dir=log_dir
-    )
-    obs = torch.stack([   torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(num_agents)], dim=0).to(device)  # (1, 202)
-    # TD loop
-    episodes_rewards = []
-    for episode in tqdm(range(args.episodes)):
-        done = False
-        obs, info = env.reset()
-        obs = torch.stack([   torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(num_agents)], dim=0).to(device)  # (1, 202)
-        state = obs
-        action = agent.act(state)
-        episode_reward = 0
-        while not done:
-            env_action = {0: action, 1: 6}  # other agent does no-op
-            next_obs, rewards, terminated, truncated, info = env.step(env_action)
-            #env.render()
-            next_state = torch.stack([   torch.FloatTensor(next_obs[i]['n_agent_overcooked_features']) for i in range(num_agents)], dim=0).to(device)
-            reward = rewards[0]
-            episode_reward += reward
-            done = terminated[0] or truncated[0]
-            next_action = agent.act(next_state) if not done else None
+    #log_dir = "logs"
+    #summaries_writer = SummaryWriter(log_dir)
+    #feature_extractor = FrozenNeuralExtractor(nn)
+    #num_state_action_features = 256
+    #explorer = NNEpsilonGreedyExplorer(num_actions=action_space.n, epsilon_start=0.0, epsilon_end=0.0, decay_steps=10000)
+    #agent = SemiGradientSARSA_NN(
+    #    agent=nn,
+    #    explorer=explorer,
+    #    step_size=1e-7,
+    #    discount=0.99,
+    #    n=3,
+    #    log_dir=log_dir
+    #)
+    #obs = torch.stack([   torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(num_agents)], dim=0).to(device)  # (1, 202)
+    ## TD loop
+    #episodes_rewards = []
+    #for episode in tqdm(range(args.episodes)):
+    #    done = False
+    #    obs, info = env.reset()
+    #    obs = torch.stack([   torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(num_agents)], dim=0).to(device)  # (1, 202)
+    #    print(f"obs shape {obs.shape}")
+    #    state = obs
+    #    action = agent.act(state)
+    #    episode_reward = 0
+    #    while not done:
+    #        env_action = {0: action, 1: 6}  # other agent does no-op
+    #        next_obs, rewards, terminated, truncated, info = env.step(env_action)
+    #        #env.render()
+    #        next_state = torch.stack([   torch.FloatTensor(next_obs[i]['n_agent_overcooked_features']) for i in range(num_agents)], dim=0).to(device)
+    #        reward = rewards[0]
+    #        episode_reward += reward
+    #        done = terminated[0] or truncated[0]
+    #        next_action = agent.act(next_state) if not done else None
 
-            # Update the agent
-            agent.update(state, action, reward, next_state, next_action, done)
+    #        # Update the agent
+    #        agent.update(state, action, reward, next_state, next_action, done)
 
-            state = next_state
-            action = next_action
-            #print(f"Episode {episode+1}, Reward: {reward}, Done: {done} action {action}")
-            #time.sleep(5)
-        print(f"episode {episode} reward {episode_reward}")
-        episodes_rewards.append(episode_reward)
+    #        state = next_state
+    #        action = next_action
+    #        #print(f"Episode {episode+1}, Reward: {reward}, Done: {done} action {action}")
+    #        #time.sleep(5)
+    #    print(f"episode {episode} reward {episode_reward}")
+    #    episodes_rewards.append(episode_reward)
     
-    # plot the rewards
-    import matplotlib.pyplot as plt
-    plt.plot(episodes_rewards)
-    plt.xlabel("Episode")
-    plt.ylabel("Reward")
-    plt.title("Episode Rewards over Time")
-    plt.savefig("episode_rewards.png")
-    plt.close()
+    ## plot the rewards
+    #import matplotlib.pyplot as plt
+    #plt.plot(episodes_rewards)
+    #plt.xlabel("Episode")
+    #plt.ylabel("Reward")
+    #plt.title("Episode Rewards over Time")
+    #plt.savefig("episode_rewards.png")
+    #plt.close()
 
 
 
-    #while True:
-    #    obs = torch.stack([   torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(num_agents)], dim=0).to(device)
-    #    actions, _, _, _ = mappo.act(obs)  # actions is a tensor of shape (num_agents,)
-    #    env_action = {i: action for i, action in enumerate(actions)}
-    #    obs, rewards, terminated, truncated, info = env.step(env_action)
-    #    env.render()
-    #    done = torch.tensor([terminated[i] or truncated[i] for i in range(num_agents)]).to(device)
-    #    if torch.all(done):
-    #        obs, info = env.reset()  # obs is a dict of obs for each agentj
-    #        break
+    while True:
+        obs = torch.stack([   torch.FloatTensor(obs[i]['n_agent_overcooked_features']) for i in range(num_agents)], dim=0).to(device)
+        actions, _, _, _ = mappo.act(obs)  # actions is a tensor of shape (num_agents,)
+        env_action = {i: action for i, action in enumerate(actions)}
+        obs, rewards, terminated, truncated, info = env.step(env_action)
+        env.render()
+        done = torch.tensor([terminated[i] or truncated[i] for i in range(num_agents)]).to(device)
+        if torch.all(done):
+            obs, info = env.reset()  # obs is a dict of obs for each agentj
+            break
     return
 
 if __name__ == '__main__':

@@ -46,7 +46,6 @@ class SarsaLambdaTileCoder:
         
         # 1. TD Error
         delta = r + self.gamma * q_next - q_curr
-        
         # 2. Update Eligibility Trace
         # We use "Replacing Traces" here as it's more stable with Tile Coding
         self.z *= self.gamma * self.lmbda
