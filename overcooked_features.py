@@ -104,6 +104,11 @@ class globalObs(feature.Feature):
             **kwargs,
         )
 
+        for feature in self.agent_features:
+            print(
+                f"Feature: {feature.name}, shape: {feature.shape}"
+            )
+
     def generate(
         self, env: cogrid_env.CoGridEnv, player_id, **kwargs
     ) -> np.ndarray:
@@ -326,6 +331,9 @@ class BinaryFeature(feature.Feature):
             overcooked_features.NextToPot(), # Binary
             # All pot features for the closest two pots
             NClosestBinaryPotFeatures(num_pots=2, grid=env.grid),
+            NextToDeliveryZone(), # Binary
+            NextToPlateStack(), # Binary
+            HoldingOnionAndNextToEmptyPot(),
             # The (dy, dx) distance to the closest other agent
             #overcooked_features.DistToOtherPlayers(
             #    num_other_players=num_agents - 1
@@ -679,3 +687,97 @@ class NClosestBinaryPotFeatures(feature.Feature):
         padded_encoding[: len(encoding)] = encoding
 
         return padded_encoding
+    
+class NextToDeliveryZone(feature.Feature):
+    """
+    Binary feature indicating if the agent is adjacent to a delivery zone.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            low=0,
+            high=1,
+            shape=(1,),
+            name="next_to_delivery_zone",
+            **kwargs,
+        )
+
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        agent = env.grid.grid_agents[player_id]
+        adjacent_positions = [
+            (agent.pos[0] + dx, agent.pos[1] + dy)
+            for dx in [-1, 0, 1]
+            for dy in [-1, 0, 1]
+            if not (dx == 0 and dy == 0)
+        ]
+        for pos in adjacent_positions:
+            tile = env.grid.get(*pos)
+            if isinstance(tile, overcooked_grid_objects.DeliveryZone):
+                return np.array([1], dtype=np.float32)
+        return np.array([0], dtype=np.float32)
+
+
+class NextToPlateStack(feature.Feature):
+    """
+    Binary feature indicating if the agent is adjacent to a plate stack.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            low=0,
+            high=1,
+            shape=(1,),
+            name="next_to_plate_stack",
+            **kwargs,
+        )
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        agent = env.grid.grid_agents[player_id]
+        adjacent_positions = [
+            (agent.pos[0] + dx, agent.pos[1] + dy)
+            for dx in [-1, 0, 1]
+            for dy in [-1, 0, 1]
+            if not (dx == 0 and dy == 0)
+        ]
+        for pos in adjacent_positions:
+            tile = env.grid.get(*pos)
+            if isinstance(tile, overcooked_grid_objects.PlateStack):
+                return np.array([1], dtype=np.float32)
+        return np.array([0], dtype=np.float32)
+
+
+class HoldingOnionAndNextToEmptyPot(feature.Feature):
+    """
+    Binary feature indicating if the agent is holding an onion and adjacent to a pot.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            low=0,
+            high=1,
+            shape=(1,),
+            name="holding_onion_and_next_to_empty_pot",
+            **kwargs,
+        )
+
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        agent = env.grid.grid_agents[player_id]
+        holding_onion = any(
+            [
+                isinstance(obj, overcooked_grid_objects.Onion)
+                for obj in agent.inventory
+            ]
+        )
+        if not holding_onion:
+            return np.array([0], dtype=np.float32)
+
+        adjacent_positions = [
+            (agent.pos[0] + dx, agent.pos[1] + dy)
+            for dx in [-1, 0, 1]
+            for dy in [-1, 0, 1]
+            if not (dx == 0 and dy == 0)
+        ]
+        for pos in adjacent_positions:
+            tile = env.grid.get(*pos)
+            if isinstance(tile, overcooked_grid_objects.Pot) and len(tile.objects_in_pot) == 0:
+                return np.array([1], dtype=np.float32)
+        return np.array([0], dtype=np.float32)

@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from tile_coding import IHT, tiles
 from overcooked_features import BinaryFeature
 from main import make_env
+from tqdm import tqdm
 
 import numpy as np
 
@@ -66,7 +67,7 @@ def extract_state_action_features(obs, action, iht, num_state_action_features):
     return feature_vector
 
 def main():
-    env = make_env(num_agents=1, layout="overcooked_cramped_room_v0", feature="Binary_feature", render_mode="human")
+    env = make_env(num_agents=1, layout="overcooked_cramped_room_v0", feature="Binary_feature", render_mode=None)
     binary_feature = BinaryFeature(env)
     episode_rewards = []
     # Initialization
@@ -84,7 +85,7 @@ def main():
 
     agent = SarsaLambdaTileCoder(num_features, alpha=0.1, lmbda=0.9, gamma=0.99, epsilon=0.01, num_actions=7)
 
-    for episode in range(1000):
+    for episode in tqdm(range(10000)):
         obs, _ = env.reset()
         
         # 1. Pick initial action
@@ -98,13 +99,13 @@ def main():
         while True:
             next_obs, reward, terminated, truncated, _ = env.step({0: action})
             reward = reward[0]  # Assuming reward is a dict with agent IDs as keys
-            done = terminated or truncated
+            done = terminated[0] or truncated[0]
             
             # 3. Pick next action and get next features
             next_action = agent.choose_action(next_obs, iht, overcooked_extract_func)
             #f_next = extract_state_action_features(next_obs, next_action, iht, num_features)
             f_next = overcooked_extract_func(next_obs, next_action, iht, num_features)
-            print(f"Episode {episode}, Reward: {reward}, Done: {done}, Action: {action}, Next Action: {next_action}") 
+            #print(f"Episode {episode}, Reward: {reward}, Done: {done}, Action: {action}, Next Action: {next_action}") 
             # 4. Step the agent
             agent.learn(f, reward, f_next, done)
             
@@ -114,7 +115,7 @@ def main():
             
             if done:
                 break
-        if episode % 1000 == 0:
+        if episode % 10 == 0:
             print(f"Episode {episode}, Total Reward: {total_reward}")
         episode_rewards.append(total_reward)
 
