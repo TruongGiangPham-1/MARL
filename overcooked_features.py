@@ -339,7 +339,7 @@ class BinaryFeature(feature.Feature):
             #    num_other_players=num_agents - 1
             #),
             # The (row, column) position of the agent
-            BinaryAgentPosition(grid=env.grid),
+            #BinaryAgentPosition(grid=env.grid),
             # The direction the agent can move in
             features.CanMoveDirection(),
         ]
@@ -690,14 +690,14 @@ class NClosestBinaryPotFeatures(feature.Feature):
     
 class NextToDeliveryZone(feature.Feature):
     """
-    Binary feature indicating if the agent is adjacent to a delivery zone.
+    One hot feature indicating if the agent is adjacent to a delivery zone.
     """
 
     def __init__(self, **kwargs):
         super().__init__(
             low=0,
             high=1,
-            shape=(1,),
+            shape=(4,),
             name="next_to_delivery_zone",
             **kwargs,
         )
@@ -706,15 +706,21 @@ class NextToDeliveryZone(feature.Feature):
         agent = env.grid.grid_agents[player_id]
         adjacent_positions = [
             (agent.pos[0] + dx, agent.pos[1] + dy)
-            for dx in [-1, 0, 1]
-            for dy in [-1, 0, 1]
-            if not (dx == 0 and dy == 0)
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]
         ]
+        one_hot = np.array([0, 0, 0, 0], dtype=np.float32)
         for pos in adjacent_positions:
             tile = env.grid.get(*pos)
             if isinstance(tile, overcooked_grid_objects.DeliveryZone):
-                return np.array([1], dtype=np.float32)
-        return np.array([0], dtype=np.float32)
+                if pos == (agent.pos[0] - 1, agent.pos[1]):
+                    one_hot[0] = 1  # Up
+                elif pos == (agent.pos[0] + 1, agent.pos[1]):
+                    one_hot[1] = 1  # Down
+                elif pos == (agent.pos[0], agent.pos[1] - 1):
+                    one_hot[2] = 1  # Left
+                elif pos == (agent.pos[0], agent.pos[1] + 1):
+                    one_hot[3] = 1  # Right
+        return one_hot 
 
 
 class NextToPlateStack(feature.Feature):
@@ -726,7 +732,7 @@ class NextToPlateStack(feature.Feature):
         super().__init__(
             low=0,
             high=1,
-            shape=(1,),
+            shape=(4,),
             name="next_to_plate_stack",
             **kwargs,
         )
@@ -734,15 +740,21 @@ class NextToPlateStack(feature.Feature):
         agent = env.grid.grid_agents[player_id]
         adjacent_positions = [
             (agent.pos[0] + dx, agent.pos[1] + dy)
-            for dx in [-1, 0, 1]
-            for dy in [-1, 0, 1]
-            if not (dx == 0 and dy == 0)
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]
         ]
+        one_hot = np.array([0, 0, 0, 0], dtype=np.float32)
         for pos in adjacent_positions:
             tile = env.grid.get(*pos)
             if isinstance(tile, overcooked_grid_objects.PlateStack):
-                return np.array([1], dtype=np.float32)
-        return np.array([0], dtype=np.float32)
+                if pos == (agent.pos[0] - 1, agent.pos[1]):
+                    one_hot[0] = 1  # Up
+                elif pos == (agent.pos[0] + 1, agent.pos[1]):
+                    one_hot[1] = 1  # Down
+                elif pos == (agent.pos[0], agent.pos[1] - 1):
+                    one_hot[2] = 1  # Left
+                elif pos == (agent.pos[0], agent.pos[1] + 1):
+                    one_hot[3] = 1  # Right
+        return one_hot  
 
 
 class HoldingOnionAndNextToEmptyPot(feature.Feature):
@@ -772,9 +784,7 @@ class HoldingOnionAndNextToEmptyPot(feature.Feature):
 
         adjacent_positions = [
             (agent.pos[0] + dx, agent.pos[1] + dy)
-            for dx in [-1, 0, 1]
-            for dy in [-1, 0, 1]
-            if not (dx == 0 and dy == 0)
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]
         ]
         for pos in adjacent_positions:
             tile = env.grid.get(*pos)

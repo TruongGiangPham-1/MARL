@@ -9,15 +9,16 @@ from tqdm import tqdm
 import numpy as np
 
 class SarsaLambdaTileCoder:
-    def __init__(self, num_features, alpha, lmbda, gamma, epsilon, n_tilings=8, num_actions=3):
-        self.w = np.zeros(num_features)      # Weight vector
-        self.z = np.zeros(num_features)      # Eligibility traces
+    def __init__(self, obs_dim, alpha, lmbda, gamma, epsilon, n_tilings=8, num_actions=3):
+        self.num_features = obs_dim * num_actions
+        self.w = np.zeros(self.num_features)      # Weight vector
+        self.z = np.zeros(self.num_features)      # Eligibility traces
         self.alpha = alpha / n_tilings       # Rescale alpha by number of tilings
         self.lmbda = lmbda
         self.gamma = gamma
         self.epsilon = epsilon
-        self.num_features = num_features
         self.num_actions = num_actions
+        self.obs_dim = obs_dim
 
     def get_q(self, features):
         # Q is the dot product of weights and the binary feature vector
@@ -25,14 +26,14 @@ class SarsaLambdaTileCoder:
         #print(f"np.sum(self.w[features.astype(bool)]) = {np.sum(self.w[features.astype(bool)])}")
         return np.sum(self.w[features.astype(bool)])
 
-    def choose_action(self, obs, iht, extract_func):
+    def choose_action(self, obs, extract_func):
         if np.random.random() < self.epsilon:
             return np.random.randint(self.num_actions) # MountainCar has 3 actions (0, 1, 2)
         
         # Calculate Q for all possible actions
         qs = []
         for a in range(self.num_actions):
-            f = extract_func(obs, a, iht, self.num_features)
+            f = extract_func(obs, a, self.obs_dim, self.num_actions)
             qs.append(self.get_q(f))
         
         # Greedy selection with tie-breaking
@@ -70,29 +71,26 @@ def main():
     binary_feature = BinaryFeature(env)
     episode_rewards = []
     # Initialization
-    num_features = 4096
-    num_features = binary_feature.shape[0] + 7  # Add 7 for the one-hot encoding of actions
-    iht = IHT(num_features) # From your tilecoding library
+    obs_dim = binary_feature.shape[0]  # Observation feature dimension
 
-    def overcooked_extract_func(obs, action, iht, num_features):
+    def overcooked_extract_func(obs, action, obs_dim, num_actions=7):
         # one shot of action
-        action_one_hot = np.zeros(7)  # Assuming 7 possible actions in Overcooked
-        action_one_hot[action] = 1.0
+        # | S| * |A| features, where |S| is the number of state features and |A| is the number of actions
         # append to observation features
-        combined_features = np.concatenate([obs[0]['n_agent_overcooked_features'], action_one_hot])
+        combined_features = np.zeros(obs_dim*num_actions, dtype=np.float32)
+        combined_features[obs_dim*action:obs_dim*(action+1)] = obs[0]['n_agent_overcooked_features']  # Assuming obs is a dict with agent IDs as keys
         return combined_features
 
-    agent = SarsaLambdaTileCoder(num_features, alpha=0.1, lmbda=0.9, gamma=0.99, epsilon=0.01, num_actions=7)
-
+    agent = SarsaLambdaTileCoder(obs_dim, alpha=0.5, lmbda=0.9, gamma=0.99, epsilon=0.01, num_actions=7)
     for episode in tqdm(range(10000)):
         obs, _ = env.reset()
         
         # 1. Pick initial action
-        action = agent.choose_action(obs, iht, overcooked_extract_func)
+        action = agent.choose_action(obs, overcooked_extract_func)
         
         # 2. Get initial features
         #f = extract_state_action_features(obs, action, iht, num_features)
-        f = overcooked_extract_func(obs, action, iht, num_features)
+        f = overcooked_extract_func(obs, action, obs_dim, num_actions=7)
         
         total_reward = 0
         while True:
@@ -101,9 +99,9 @@ def main():
             done = terminated[0] or truncated[0]
             
             # 3. Pick next action and get next features
-            next_action = agent.choose_action(next_obs, iht, overcooked_extract_func)
+            next_action = agent.choose_action(next_obs, overcooked_extract_func)
             #f_next = extract_state_action_features(next_obs, next_action, iht, num_features)
-            f_next = overcooked_extract_func(next_obs, next_action, iht, num_features)
+            f_next = overcooked_extract_func(next_obs, next_action, obs_dim, num_actions=7)
             #print(f"Episode {episode}, Reward: {reward}, Done: {done}, Action: {action}, Next Action: {next_action}") 
             # 4. Step the agent
             agent.learn(f, reward, f_next, done)
@@ -111,11 +109,13 @@ def main():
             # 5. Transition
             obs, action, f = next_obs, next_action, f_next
             total_reward += reward
+            if reward == 1:
+                print(f"Episode {episode}, Reward: {reward}, Done: {done}, Action: {action}, Next Action: {next_action}")
+            elif reward == 0.1:
+                print(f"Episode {episode}, Reward: {reward}, Done: {done}, Action: {action}, Next Action: {next_action}")
             
             if done:
                 break
-        if episode % 10 == 0:
-            print(f"Episode {episode}, Total Reward: {total_reward}")
         episode_rewards.append(total_reward)
 
     # Plotting the episode rewards
@@ -125,6 +125,8 @@ def main():
     plt.xlabel('Episode')
     plt.ylabel('Total Reward')
     plt.title('Episode Rewards over Time')
+    # save the plot
+    plt.savefig("sarsa_lambda_rewards.png")
     plt.show()
 
 if __name__ == "__main__":
