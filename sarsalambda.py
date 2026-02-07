@@ -5,17 +5,20 @@ from tile_coding import IHT, tiles
 from overcooked_features import BinaryFeature
 from main import make_env
 from tqdm import tqdm
+import cv2
+import time
+import argparse
 # import summary_writer for logging
 from torch.utils.tensorboard import SummaryWriter
 
 import numpy as np
 
 class SarsaLambdaTileCoder:
-    def __init__(self, obs_dim, alpha, lmbda, gamma, epsilon, n_tilings=8, num_actions=3):
+    def __init__(self, obs_dim, alpha, lmbda, gamma, epsilon,  num_actions=3):
         self.num_features = obs_dim * num_actions
         self.w = np.zeros(self.num_features)      # Weight vector
         self.z = np.zeros(self.num_features)      # Eligibility traces
-        self.alpha = alpha / n_tilings       # Rescale alpha by number of tilings
+        self.alpha = alpha      
         self.lmbda = lmbda
         self.gamma = gamma
         self.epsilon = epsilon
@@ -68,8 +71,50 @@ def extract_state_action_features(obs, action, iht, num_state_action_features):
     feature_vector[active_tiles] = 1.0
     return feature_vector
 
+def inference_loop(agent, env, extract_func, num_episodes=1000, episode_id=0):
+    episode_rewards = []
+    frame_list = []
+    for episode in tqdm(range(num_episodes)):
+        obs, _ = env.reset()
+        action = agent.choose_action(obs, extract_func)
+        f = extract_func(obs, action, agent.obs_dim, agent.num_actions)
+        total_reward = 0
+        while True:
+            next_obs, reward, terminated, truncated, _ = env.step({0: action})
+            img = env.render()
+            frame_list.append(img)
+            reward = reward[0]  # Assuming reward is a dict with agent IDs as keys
+            done = terminated[0] or truncated[0]
+            next_action = agent.choose_action(next_obs, extract_func)
+            f_next = extract_func(next_obs, next_action, agent.obs_dim, agent.num_actions)
+
+            obs, action, f = next_obs, next_action, f_next
+            total_reward += reward
+            if done:
+                break
+            #time.sleep(0.1)  # add a small delay to slow down the rendering
+        episode_rewards.append(total_reward)
+    import imageio
+    imageio.mimsave(f'sarsa_lambda_inference_episode_{episode_id}.gif', frame_list, fps=10)
+    return episode_rewards
+
 def main():
-    env = make_env(num_agents=1, layout="overcooked_cramped_room_v0", feature="Binary_feature", render_mode=None)
+
+    parser = argparse.ArgumentParser(description="SARSA Lambda with Tile Coding in Overcooked")
+    parser.add_argument("--num_episodes", type=int, default=10000, help="Number of training episodes")
+    parser.add_argument("--alpha", type=float, default=0.1, help="Learning rate")
+    parser.add_argument("--lambda_", type=float, default=0.9, help="Eligibility trace decay rate")
+    parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
+    parser.add_argument("--epsilon", type=float, default=0.01, help="Exploration rate")
+    parser.add_argument("--data_path", type=str, default="sarsa_lambda_data", help="Path to save model weights and logs")
+    args = parser.parse_args()
+
+    # create data path if it doesn't exist
+    import os
+    if not os.path.exists(args.data_path):
+        os.makedirs(args.data_path)
+
+    env = make_env(num_agents=1, layout="overcooked_cramped_room_v0", feature="Binary_feature", render_mode="rgb_array")
     binary_feature = BinaryFeature(env)
     episode_rewards = []
     # Initialization
@@ -83,7 +128,17 @@ def main():
         combined_features[obs_dim*action:obs_dim*(action+1)] = obs[0]['n_agent_overcooked_features']  # Assuming obs is a dict with agent IDs as keys
         return combined_features
 
-    agent = SarsaLambdaTileCoder(obs_dim, alpha=0.5, lmbda=0.9, gamma=0.99, epsilon=0.01, num_actions=7)
+    agent = SarsaLambdaTileCoder(obs_dim, alpha=args.alpha, lmbda=args.lambda_, gamma=args.gamma, epsilon=args.epsilon, num_actions=7)
+    # read sarsa lambda weights and traces from file if they exist
+    try:
+        #agent.w = np.load("sarsa_lambda_weights_episode_2000.npy")
+        #agent.z = np.load("sarsa_lambda_traces_episode_2000.npy")
+        print("Loaded SARSA Lambda weights and traces from file.")
+    except FileNotFoundError:
+        print("No saved weights or traces found. Starting with fresh weights and traces.")
+    
+    #inference_loop(agent, env, overcooked_extract_func, num_episodes=2)
+    #return
 
     freq_dict = {
         "delivery_reward": 0,
@@ -100,6 +155,11 @@ def main():
         # 2. Get initial features
         #f = extract_state_action_features(obs, action, iht, num_features)
         f = overcooked_extract_func(obs, action, obs_dim, num_actions=7)
+        freq_dict = {
+            "delivery_reward": 0,
+            "num_onions_in_pot_reward": 0,
+            "num_soups_in_dish_reward": 0,
+        }
         
         total_reward = 0
         while True:
@@ -123,20 +183,24 @@ def main():
                 print(f"Delivery reward at Episode {episode}, Action: {action}, Next Action: {next_action}")
             elif reward == 0.3:
                 print(f"plate reward at Episode {episode}, Action: {action}, Next Action: {next_action}")
-                freq_dict["num_onions_in_pot_reward"] += 1
-            elif reward == 0.1:
                 freq_dict["num_soups_in_dish_reward"] += 1
+            elif reward == 0.1:
+                freq_dict["num_onions_in_pot_reward"] += 1
             if done:
                 break
-            summary_writer.add_scalar("Reward/delivery_reward", freq_dict["delivery_reward"], episode)
-            summary_writer.add_scalar("Reward/num_onions_in_pot_reward", freq_dict["num_onions_in_pot_reward"], episode)
-            summary_writer.add_scalar("Reward/num_soups_in_dish_reward", freq_dict["num_soups_in_dish_reward"], episode)
+        summary_writer.add_scalar("Total Reward", total_reward, episode)
+        summary_writer.add_scalar("Delivery Reward Count", freq_dict["delivery_reward"], episode)
+        summary_writer.add_scalar("Onions in Pot Reward Count", freq_dict["num_onions_in_pot_reward"], episode)
+        summary_writer.add_scalar("Soups in Dish Reward Count", freq_dict["num_soups_in_dish_reward"], episode)
 
         if episode % 1000 == 0:
             # save the model weights every 1000 episodes
-            np.save(f"sarsa_lambda_weights_episode_{episode}.npy", agent.w)
-            np.save(f"sarsa_lambda_traces_episode_{episode}.npy", agent.z)
+            np.save(f"{args.data_path}/sarsa_lambda_weights_episode_{episode}.npy", agent.w)
+            np.save(f"{args.data_path}/sarsa_lambda_traces_episode_{episode}.npy", agent.z)
             print(f"Episode {episode}, Total Reward: {total_reward}")
+        if episode % 1000 == 0:
+            # run inference every 100 episodes
+            inference_loop(agent, env, overcooked_extract_func, num_episodes=1, episode_id=episode)
         episode_rewards.append(total_reward)
 
     # Plotting the episode rewards
@@ -147,7 +211,7 @@ def main():
     plt.ylabel('Total Reward')
     plt.title('Episode Rewards over Time')
     # save the plot
-    plt.savefig("sarsa_lambda_rewards.png")
+    plt.savefig(f"{args.data_path}/sarsa_lambda_rewards.png")
     plt.show()
 
 if __name__ == "__main__":

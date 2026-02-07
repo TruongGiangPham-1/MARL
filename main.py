@@ -294,8 +294,8 @@ def main():
         episode_returns, freq_dict = qmix_environment_loop(agent, vec_env, device, num_episodes=args.num_episodes, log_dir=log_dir, args=args)
     elif args.algorithm == 'sarsa':
         # Semi-Gradient SARSA uses step-based learning
-        num_episode = args.total_steps // 1000  # assuming average episode length of 1000 steps
-        episode_returns, freq_dict = agent_environment_sarsa_loop(agent, vec_env, num_episodes=num_episode, log_dir=log_dir)
+        num_episode = args.total_steps // 200  # assuming average episode length of 200 steps
+        episode_returns  = agent_environment_sarsa_loop(agent, vec_env, num_episodes=num_episode, log_dir=log_dir)
     else:
         # MAPPO/CMAPPO use step-based learning
         episode_returns, freq_dict = agent_environment_loop(agent, vec_env, device, num_update=num_updates, log_dir=log_dir, args=args)

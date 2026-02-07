@@ -481,7 +481,7 @@ def _calc_binary_pot_features(pot: overcooked_grid_objects.Pot, agent, grid: cog
             #pot_cooking_time,
             #pot_distance,
             #pot_location,
-            binary_pot_location,
+            #binary_pot_location,
         ]
     )
 
@@ -513,7 +513,8 @@ class NClosestBinaryPotFeatures(feature.Feature):
         super().__init__(
             low=-np.inf,
             high=np.inf,
-            shape=(num_pots * (11 + grid.height * grid.width),),
+            #shape=(num_pots * (11 + grid.height * grid.width),),
+            shape=(num_pots * (11),),
             name="n_closest_pot_features",
             **kwargs,
         )
