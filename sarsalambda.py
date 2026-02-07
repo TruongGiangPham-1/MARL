@@ -5,6 +5,8 @@ from tile_coding import IHT, tiles
 from overcooked_features import BinaryFeature
 from main import make_env
 from tqdm import tqdm
+# import summary_writer for logging
+from torch.utils.tensorboard import SummaryWriter
 
 import numpy as np
 
@@ -82,6 +84,13 @@ def main():
         return combined_features
 
     agent = SarsaLambdaTileCoder(obs_dim, alpha=0.5, lmbda=0.9, gamma=0.99, epsilon=0.01, num_actions=7)
+
+    freq_dict = {
+        "delivery_reward": 0,
+        "num_onions_in_pot_reward": 0,
+        "num_soups_in_dish_reward": 0,
+    }
+    summary_writer = SummaryWriter(log_dir="sarsa_lambda_logs")
     for episode in tqdm(range(10000)):
         obs, _ = env.reset()
         
@@ -110,12 +119,24 @@ def main():
             obs, action, f = next_obs, next_action, f_next
             total_reward += reward
             if reward == 1:
-                print(f"Episode {episode}, Reward: {reward}, Done: {done}, Action: {action}, Next Action: {next_action}")
+                freq_dict["delivery_reward"] += 1
+                print(f"Delivery reward at Episode {episode}, Action: {action}, Next Action: {next_action}")
+            elif reward == 0.3:
+                print(f"plate reward at Episode {episode}, Action: {action}, Next Action: {next_action}")
+                freq_dict["num_onions_in_pot_reward"] += 1
             elif reward == 0.1:
-                print(f"Episode {episode}, Reward: {reward}, Done: {done}, Action: {action}, Next Action: {next_action}")
-            
+                freq_dict["num_soups_in_dish_reward"] += 1
             if done:
                 break
+            summary_writer.add_scalar("Reward/delivery_reward", freq_dict["delivery_reward"], episode)
+            summary_writer.add_scalar("Reward/num_onions_in_pot_reward", freq_dict["num_onions_in_pot_reward"], episode)
+            summary_writer.add_scalar("Reward/num_soups_in_dish_reward", freq_dict["num_soups_in_dish_reward"], episode)
+
+        if episode % 1000 == 0:
+            # save the model weights every 1000 episodes
+            np.save(f"sarsa_lambda_weights_episode_{episode}.npy", agent.w)
+            np.save(f"sarsa_lambda_traces_episode_{episode}.npy", agent.z)
+            print(f"Episode {episode}, Total Reward: {total_reward}")
         episode_rewards.append(total_reward)
 
     # Plotting the episode rewards
