@@ -3,10 +3,10 @@ all:
 	--total-steps 1000000
 
 cramped:
-	python3 main.py --save-path models --num-agents 1 --num-envs 1 --layout overcooked_cramped_room_v0  --num-steps 256 --num-minibatches 4 \
-	--total-steps 20000000 --seed 3 --log --ppo-epoch 5 --clip-param 0.05 \
+	python3 main.py --save-path models --num-agents 1 --num-envs 16 --layout overcooked_cramped_room_v0  --num-steps 256 --num-minibatches 4 \
+	--total-steps 20000000 --seed 7 --ppo-epoch 5 --clip-param 0.05 \
 	--value-loss-coef 0.1 --entropy-coef 0.01 --gamma 0.99 --lam 0.95 --max-grad-norm 0.5 --lr 3e-4 --data-path data \
-	--feature local_obs
+	--feature Binary_feature --log
 
 forced:
 	python3 main.py --save-path models --num-agents 2 --num-envs 16 --layout overcooked_forced_coordination_v0  --num-steps 256 --num-minibatches 4 \
@@ -50,10 +50,13 @@ qmix-debug:
 sarsa:
 	python3 main.py --algorithm sarsa --save-path models --num-agents 1 --num-envs 1 --layout overcooked_cramped_room_v0 \
 	--total-steps 1000000 --seed 1 --step-size 0.01 --data-path data \
-	--feature local_obs
+	--feature Binary_feature --log
 
 freeze:
-	python3 freeze_CNN_RL.py --model-path models/decentralised_policy_2_agents_overcooked_cramped_room_v0_seed_2.pth --layout overcooked_cramped_room_v0 --episodes 100
+	python3 freeze_CNN_RL.py --model-path models/decentralised_policy_1_agents_overcooked_cramped_room_v0_seed_7.pth --layout overcooked_cramped_room_v0 --episodes 1000
+
+sarsa-lambda:
+	python3 sarsalambda.py --num_episodes 10000 --alpha 0.1 --lambda_ 0.9 --gamma 0.999 --epsilon 0.1 --data_path sarsa_lambda_data
 
 # Test QMIX implementation
 test-qmix:

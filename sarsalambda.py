@@ -42,8 +42,14 @@ class SarsaLambdaTileCoder:
             qs.append(self.get_q(f))
         
         # Greedy selection with tie-breaking
+        qs = np.array(qs)
         max_q = np.max(qs)
         ties = np.flatnonzero(np.abs(qs - max_q) < 1e-8)
+        
+        # Safety check: if no ties found, just use argmax
+        if len(ties) == 0:
+            ties = np.array([np.argmax(qs)])
+        
         return np.random.choice(ties)
 
     def learn(self, f, r, f_next, done):
@@ -71,7 +77,7 @@ def extract_state_action_features(obs, action, iht, num_state_action_features):
     feature_vector[active_tiles] = 1.0
     return feature_vector
 
-def inference_loop(agent, env, extract_func, num_episodes=1000, episode_id=0):
+def inference_loop(agent, env, extract_func, num_episodes=1000, episode_id=0, data_path="sarsa_lambda_data"):
     episode_rewards = []
     frame_list = []
     for episode in tqdm(range(num_episodes)):
@@ -95,7 +101,7 @@ def inference_loop(agent, env, extract_func, num_episodes=1000, episode_id=0):
             #time.sleep(0.1)  # add a small delay to slow down the rendering
         episode_rewards.append(total_reward)
     import imageio
-    imageio.mimsave(f'sarsa_lambda_inference_episode_{episode_id}.gif', frame_list, fps=10)
+    imageio.mimsave(f'{data_path}/sarsa_lambda_inference_episode_{episode_id}_num_frames_{len(frame_list)}.gif', frame_list, fps=10)
     return episode_rewards
 
 def main():
@@ -131,8 +137,8 @@ def main():
     agent = SarsaLambdaTileCoder(obs_dim, alpha=args.alpha, lmbda=args.lambda_, gamma=args.gamma, epsilon=args.epsilon, num_actions=7)
     # read sarsa lambda weights and traces from file if they exist
     try:
-        #agent.w = np.load("sarsa_lambda_weights_episode_2000.npy")
-        #agent.z = np.load("sarsa_lambda_traces_episode_2000.npy")
+        #agent.w = np.load(f"{args.data_path}/sarsa_lambda_weights_episode_2000.npy")
+        #agent.z = np.load(f"{args.data_path}/sarsa_lambda_traces_episode_2000.npy")
         print("Loaded SARSA Lambda weights and traces from file.")
     except FileNotFoundError:
         print("No saved weights or traces found. Starting with fresh weights and traces.")
@@ -162,6 +168,7 @@ def main():
         }
         
         total_reward = 0
+        count= 0
         while True:
             next_obs, reward, terminated, truncated, _ = env.step({0: action})
             reward = reward[0]  # Assuming reward is a dict with agent IDs as keys
@@ -186,13 +193,13 @@ def main():
                 freq_dict["num_soups_in_dish_reward"] += 1
             elif reward == 0.1:
                 freq_dict["num_onions_in_pot_reward"] += 1
+                count += 1
             if done:
                 break
         summary_writer.add_scalar("Total Reward", total_reward, episode)
         summary_writer.add_scalar("Delivery Reward Count", freq_dict["delivery_reward"], episode)
         summary_writer.add_scalar("Onions in Pot Reward Count", freq_dict["num_onions_in_pot_reward"], episode)
         summary_writer.add_scalar("Soups in Dish Reward Count", freq_dict["num_soups_in_dish_reward"], episode)
-
         if episode % 1000 == 0:
             # save the model weights every 1000 episodes
             np.save(f"{args.data_path}/sarsa_lambda_weights_episode_{episode}.npy", agent.w)
@@ -200,7 +207,7 @@ def main():
             print(f"Episode {episode}, Total Reward: {total_reward}")
         if episode % 1000 == 0:
             # run inference every 100 episodes
-            inference_loop(agent, env, overcooked_extract_func, num_episodes=1, episode_id=episode)
+            inference_loop(agent, env, overcooked_extract_func, num_episodes=1, episode_id=episode, data_path=args.data_path)
         episode_rewards.append(total_reward)
 
     # Plotting the episode rewards
