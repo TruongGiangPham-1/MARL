@@ -1,9 +1,11 @@
+import json
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import imageio
 from supersuit.vector.constructors import MakeCPUAsyncConstructor
+import hashlib
 import cloudpickle
 
 from io import BytesIO
@@ -54,3 +56,40 @@ def concat_vec_envs_v1(vec_env, num_vec_envs, num_cpus=0, base_class="gymnasium"
         raise ValueError(
             "supersuit_vec_env only supports 'gymnasium', 'stable_baselines', and 'stable_baselines3' for its base_class"
         )
+    
+def get_hash_id(args, exclude_keys=("seed", "data_path", "log", "num_episodes"), n=8):
+    # remove excluded keys (like seed)
+    args_filtered = {k: v for k, v in args.items() if k not in exclude_keys}
+    args_json = json.dumps(args_filtered, sort_keys=True)
+    h = hashlib.md5(args_json.encode()).hexdigest() 
+    return h[:n]
+
+def get_run_folder(args):
+    """
+    Create run_folder=data_path/layout/hash_id/seed_folder if not exist
+    eg file structure for results: 
+        data/
+        ├── cramped_room/
+        │   └── <hashID>/
+        │       ├── seed_1/
+        │       │   ├── reward.csv
+        │       │   ├── config.json
+        │       │   └── checkpoints/
+        │       ├── seed_2/
+        │       │   ├── reward.csv
+        │       │   ├── config.json
+        │       │   └── checkpoints/
+        │       └── seed_3/
+    :param args: {key: value} dictionary of command line arguments
+    :return: run_folder path
+    """
+    import os
+
+    base = args.get("data_path", "data")
+    layout = args["layout"]
+    hash_id = get_hash_id(args)
+    seed_folder = f"seed_{args['seed']}"
+
+    run_folder = os.path.join(base, layout, hash_id, seed_folder)
+    os.makedirs(run_folder, exist_ok=True)
+    return run_folder

@@ -1,3 +1,4 @@
+import hashlib
 import gymnasium as gym
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,6 +9,9 @@ from tqdm import tqdm
 import cv2
 import time
 import argparse
+import json
+import os
+from utils import get_hash_id, get_run_folder
 # import summary_writer for logging
 from torch.utils.tensorboard import SummaryWriter
 
@@ -113,14 +117,20 @@ def main():
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
     parser.add_argument("--epsilon", type=float, default=0.01, help="Exploration rate")
     parser.add_argument("--data_path", type=str, default="sarsa_lambda_data", help="Path to save model weights and logs")
+    parser.add_argument("--seed", type=int, default=1, help="Random seed for reproducibility")
+    parser.add_argument("--layout", type=str, default="overcooked_cramped_room_v0", help="Environment layout")
+    parser.add_argument("--feature", type=str, default="Binary_feature", help="Feature type for environment")
     args = parser.parse_args()
 
-    # create data path if it doesn't exist
-    import os
-    if not os.path.exists(args.data_path):
-        os.makedirs(args.data_path)
+    # args to dict
+    args_dict = vars(args)
+    run_folder = get_run_folder(args_dict)
 
-    env = make_env(num_agents=1, layout="overcooked_cramped_room_v0", feature="Binary_feature", render_mode="rgb_array")
+    # create data path if it doesn't exist
+    if not os.path.exists(run_folder):
+        os.makedirs(run_folder)
+
+    env = make_env(num_agents=1, layout=args.layout, feature=args.feature, render_mode="rgb_array")
     binary_feature = BinaryFeature(env)
     episode_rewards = []
     # Initialization
@@ -208,7 +218,7 @@ def main():
             print(f"Episode {episode}, Total Reward: {total_reward}")
         if episode % 1000 == 0:
             # run inference every 100 episodes
-            inference_loop(agent, env, overcooked_extract_func, num_episodes=1, episode_id=episode, data_path=args.data_path)
+            inference_loop(agent, env, overcooked_extract_func, num_episodes=1, episode_id=episode, data_path=run_folder)
         episode_rewards.append(total_reward)
 
     # Plotting the episode rewards
