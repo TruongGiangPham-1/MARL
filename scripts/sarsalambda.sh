@@ -4,7 +4,7 @@
 #SBATCH --mem=8G
 #SBATCH --time=5:00:00
 #SBATCH --account=aip-mtaylor3
-#SBATCH --output=/home/truonggi/scratch/slurm_out/%A.out
+#SBATCH --output=/home/truonggi/projects/aip-mtaylor3/truonggi/slurm_out/%A.out
 #SBATCH --mail-user=truonggi@ualberta.ca
 #SBATCH --mail-type=ALL
 
