@@ -26,7 +26,7 @@ echo ${14} # layout
 echo ${15} # feature
 
 # parameter tune
-python3 ../sarsalambda.py --num-episodes $1 --gamma $2 --lambda_ $3 --epsilon $4 --alpha $5 --seed $6 --data_path ${13} --layout ${14} --feature ${15}
+python3 ../sarsalambda.py --num_episodes $1 --gamma $2 --lambda_ $3 --epsilon $4 --alpha $5 --seed $6 --data_path ${13} --layout ${14} --feature ${15}
 
 
 EPSILON=(0.001 0.005 0.01 0.05 0.1 0.2)
@@ -44,7 +44,7 @@ for epsilon in "${EPSILON[@]}"; do
                 for seed in "${SEED[@]}"; do
                     for layout in "${LAYOUT[@]}"; do
                         for feature in "${FEATURE[@]}"; do
-                            python3 ../sarsalambda.py --num-episodes $1 --gamma $gamma --lambda_ $lambda --epsilon $epsilon --alpha $alpha --seed $seed --data_path ${13} --layout $layout --feature $feature
+                            python3 ../sarsalambda.py --num_episodes $1 --gamma $gamma --lambda_ $lambda --epsilon $epsilon --alpha $alpha --seed $seed --data_path ${13} --layout $layout --feature $feature
                         done
                     done
                 done
