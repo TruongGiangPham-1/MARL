@@ -105,7 +105,7 @@ def inference_loop(agent, env, extract_func, num_episodes=1000, episode_id=0, da
             #time.sleep(0.1)  # add a small delay to slow down the rendering
         episode_rewards.append(total_reward)
     import imageio
-    imageio.mimsave(f'{data_path}/sarsa_lambda_inference_episode_{episode_id}_num_frames_{len(frame_list)}.gif', frame_list, fps=10)
+    #imageio.mimsave(f'{data_path}/sarsa_lambda_inference_episode_{episode_id}_num_frames_{len(frame_list)}.gif', frame_list, fps=10)
     return episode_rewards
 
 def main():
@@ -213,11 +213,11 @@ def main():
         summary_writer.add_scalar("weight_mean", np.mean(agent.w), episode)
         if episode % 1000 == 0:
             # save the model weights every 1000 episodes
-            np.save(f"{args.data_path}/sarsa_lambda_weights_episode_{episode}.npy", agent.w)
-            np.save(f"{args.data_path}/sarsa_lambda_traces_episode_{episode}.npy", agent.z)
+            np.save(f"{run_folder}/sarsa_lambda_weights_episode_{episode}.npy", agent.w)
+            np.save(f"{run_folder}/sarsa_lambda_traces_episode_{episode}.npy", agent.z)
             print(f"Episode {episode}, Total Reward: {total_reward}")
-        if episode % 1000 == 0:
-            # run inference every 100 episodes
+        if episode % 2000 == 0:
+            # run inference every 2000 episodes
             inference_loop(agent, env, overcooked_extract_func, num_episodes=1, episode_id=episode, data_path=run_folder)
         episode_rewards.append(total_reward)
 
@@ -229,7 +229,7 @@ def main():
     plt.ylabel('Total Reward')
     plt.title('Episode Rewards over Time')
     # save the plot
-    plt.savefig(f"{args.data_path}/sarsa_lambda_rewards.png")
+    plt.savefig(f"{run_folder}/sarsa_lambda_rewards.png")
     plt.show()
 
 if __name__ == "__main__":
