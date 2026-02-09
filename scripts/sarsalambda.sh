@@ -21,9 +21,9 @@ echo $3 # lambda
 echo $4 # epsilon
 echo $5 # alpha
 echo $6 # seed
-echo ${13} # data_path
-echo ${14} # layout
-echo ${15} # feature
+echo $7 # data_path
+echo ${8} # layouat
+echo ${9} # feature
 
 # parameter tune
-python3 ../sarsalambda.py --num_episodes $1 --gamma $2 --lambda_ $3 --epsilon $4 --alpha $5 --seed $6 --data_path ${13} --layout ${14} --feature ${15}
+python3 ../sarsalambda.py --num_episodes $1 --gamma $2 --lambda_ $3 --epsilon $4 --alpha $5 --seed $6 --data_path $7 --layout $8 --feature $9

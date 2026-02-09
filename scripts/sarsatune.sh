@@ -6,9 +6,9 @@
 #echo $4 # epsilon
 #echo $5 # alpha
 #echo $6 # seed
-#echo ${13} # data_path
-#echo ${14} # layout
-#echo ${15} # feature
+#echo $7 # data_path
+#echo $8 # layout
+#echo $9 # feature
 
 EPSILON=(0.001 0.005 0.01 0.05 0.1 0.2)
 GAMMA=(0.9 0.95 0.99 0.999)
@@ -26,7 +26,7 @@ for epsilon in "${EPSILON[@]}"; do
                 for seed in "${SEED[@]}"; do
                     for layout in "${LAYOUT[@]}"; do
                         for feature in "${FEATURE[@]}"; do
-                            ./sarsalambda.sh 100000 $gamma $lambda $epsilon $alpha $seed $DATA_PATH $layout $feature
+                            sbatch sarsalambda.sh 100000 $gamma $lambda $epsilon $alpha $seed $DATA_PATH $layout $feature
                         done
                     done
                 done
