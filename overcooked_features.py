@@ -458,6 +458,9 @@ def _calc_binary_pot_features(pot: overcooked_grid_objects.Pot, agent, grid: cog
     if pot.dish_ready:
         pot_status[0] = 1
     elif len(pot.objects_in_pot) == 0:
+        #pot_status[1] = 1
+        pass
+    elif len(pot.objects_in_pot) > 0:
         pot_status[1] = 1
     elif len(pot.objects_in_pot) == pot.capacity:
         pot_status[2] = 1
@@ -767,5 +770,35 @@ class HoldingSoupAndFacingDeliveryZone(feature.Feature):
         for pos in adjacent_positions:
             tile = env.grid.get(*pos)
             if isinstance(tile, overcooked_grid_objects.DeliveryZone) and pos == front_pos:
+                return np.array([1], dtype=np.float32)
+        return np.array([0], dtype=np.float32)
+    
+class HoldingPlateAndPotReady(feature.Feature):
+    """
+    Binary feature indicating if the agent is holding a plate and there is a ready pot adjacent to them.
+    Different thatn HoldingPlateAndFacingReadyPot in that the pot doesn't have to be in front of them, just ready anywhere in the map
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            low=0,
+            high=1,
+            shape=(1,),
+            name="holding_plate_and_pot_ready",
+            **kwargs,
+        )
+
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        agent = env.grid.grid_agents[player_id]
+        holding_plate = any(
+            [
+                isinstance(obj, overcooked_grid_objects.Plate)
+                for obj in agent.inventory
+            ]
+        )
+        if not holding_plate:
+            return np.array([0], dtype=np.float32)
+        for tile in env.grid.grid:
+            if isinstance(tile, overcooked_grid_objects.Pot) and tile.dish_ready:
                 return np.array([1], dtype=np.float32)
         return np.array([0], dtype=np.float32)

@@ -152,7 +152,7 @@ def main():
         "num_soups_in_dish_reward": 0,
     }
     summary_writer = SummaryWriter(log_dir="sarsa_lambda_logs")
-    for episode in tqdm(range(10000)):
+    for episode in tqdm(range(args.num_episodes)):
         obs, _ = env.reset()
         
         # 1. Pick initial action
@@ -172,7 +172,7 @@ def main():
         while True:
             next_obs, reward, terminated, truncated, _ = env.step({0: action})
             reward = reward[0]  # Assuming reward is a dict with agent IDs as keys
-            done = terminated[0] or truncated[0]
+            done = terminated[0] or truncated[0] or reward == 1  # end episode if delivery reward is received
             
             # 3. Pick next action and get next features
             next_action = agent.choose_action(next_obs, overcooked_extract_func)
@@ -200,6 +200,7 @@ def main():
         summary_writer.add_scalar("Delivery Reward Count", freq_dict["delivery_reward"], episode)
         summary_writer.add_scalar("Onions in Pot Reward Count", freq_dict["num_onions_in_pot_reward"], episode)
         summary_writer.add_scalar("Soups in Dish Reward Count", freq_dict["num_soups_in_dish_reward"], episode)
+        summary_writer.add_scalar("weight_mean", np.mean(agent.w), episode)
         if episode % 1000 == 0:
             # save the model weights every 1000 episodes
             np.save(f"{args.data_path}/sarsa_lambda_weights_episode_{episode}.npy", agent.w)
