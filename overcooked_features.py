@@ -336,6 +336,7 @@ class BinaryFeature(feature.Feature):
             HoldingOnionAndFacingPot(),
             HoldingSoupAndFacingDeliveryZone(),
             HoldingPlateAndFacingReadyPot(),
+            HoldingPlateAndPotReady(),
             # The (dy, dx) distance to the closest other agent
             #overcooked_features.DistToOtherPlayers(
             #    num_other_players=num_agents - 1

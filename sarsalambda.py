@@ -12,6 +12,7 @@ import argparse
 import json
 import os
 from utils import get_hash_id, get_run_folder
+import pandas as pd
 # import summary_writer for logging
 from torch.utils.tensorboard import SummaryWriter
 
@@ -206,19 +207,23 @@ def main():
                 count += 1
             if done:
                 break
-        summary_writer.add_scalar("Total Reward", total_reward, episode)
-        summary_writer.add_scalar("Delivery Reward Count", freq_dict["delivery_reward"], episode)
-        summary_writer.add_scalar("Onions in Pot Reward Count", freq_dict["num_onions_in_pot_reward"], episode)
-        summary_writer.add_scalar("Soups in Dish Reward Count", freq_dict["num_soups_in_dish_reward"], episode)
-        summary_writer.add_scalar("weight_mean", np.mean(agent.w), episode)
+        #summary_writer.add_scalar("Total Reward", total_reward, episode)
+        #summary_writer.add_scalar("Delivery Reward Count", freq_dict["delivery_reward"], episode)
+        #summary_writer.add_scalar("Onions in Pot Reward Count", freq_dict["num_onions_in_pot_reward"], episode)
+        #summary_writer.add_scalar("Soups in Dish Reward Count", freq_dict["num_soups_in_dish_reward"], episode)
+        #summary_writer.add_scalar("weight_mean", np.mean(agent.w), episode)
         if episode % 1000 == 0:
             # save the model weights every 1000 episodes
-            np.save(f"{run_folder}/sarsa_lambda_weights_episode_{episode}.npy", agent.w)
-            np.save(f"{run_folder}/sarsa_lambda_traces_episode_{episode}.npy", agent.z)
+            #np.save(f"{run_folder}/sarsa_lambda_weights_episode_{episode}.npy", agent.w)
+            #np.save(f"{run_folder}/sarsa_lambda_traces_episode_{episode}.npy", agent.z)
+            # save episode_rewards into run folder
+            df = pd.DataFrame(episode_rewards)
+            df.to_csv(os.path.join(run_folder, 'episode_returns.csv'))
             print(f"Episode {episode}, Total Reward: {total_reward}")
         if episode % 2000 == 0:
             # run inference every 2000 episodes
-            inference_loop(agent, env, overcooked_extract_func, num_episodes=1, episode_id=episode, data_path=run_folder)
+            #inference_loop(agent, env, overcooked_extract_func, num_episodes=1, episode_id=episode, data_path=run_folder)
+            pass
         episode_rewards.append(total_reward)
 
     # Plotting the episode rewards
