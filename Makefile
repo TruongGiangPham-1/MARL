@@ -57,7 +57,7 @@ freeze:
 
 sarsa-lambda:
 	#python3 sarsalambda.py --num_episodes 10000 --alpha 0.1 --lambda_ 0.9 --gamma 0.999 --epsilon 0.1 --data_path sarsa_lambda_data
-	python sarsalambda.py --num_episodes 3000 --alpha 0.005 --epsilon_decay 0.9995 --data_path smoke_test
+	python sarsalambda.py --num_episodes 3000 --alpha 0.005 --epsilon_decay 0.9995 --data_path smoke_test --feature Binary_feature_v2
 
 
 # Test QMIX implementation
