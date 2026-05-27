@@ -104,6 +104,11 @@ class globalObs(feature.Feature):
             **kwargs,
         )
 
+        for feature in self.agent_features:
+            print(
+                f"Feature: {feature.name}, shape: {feature.shape}"
+            )
+
     def generate(
         self, env: cogrid_env.CoGridEnv, player_id, **kwargs
     ) -> np.ndarray:
@@ -326,12 +331,18 @@ class BinaryFeature(feature.Feature):
             overcooked_features.NextToPot(), # Binary
             # All pot features for the closest two pots
             NClosestBinaryPotFeatures(num_pots=2, grid=env.grid),
+            NextToDeliveryZone(), # Binary
+            NextToPlateStack(), # Binary
+            HoldingOnionAndFacingPot(),
+            HoldingSoupAndFacingDeliveryZone(),
+            HoldingPlateAndFacingReadyPot(),
+            HoldingPlateAndPotReady(),
             # The (dy, dx) distance to the closest other agent
             #overcooked_features.DistToOtherPlayers(
             #    num_other_players=num_agents - 1
             #),
             # The (row, column) position of the agent
-            BinaryAgentPosition(grid=env.grid),
+            #BinaryAgentPosition(grid=env.grid),
             # The direction the agent can move in
             features.CanMoveDirection(),
         ]
@@ -369,128 +380,6 @@ class BinaryFeature(feature.Feature):
             encoded_features.append(feature.generate(env, player_id))
 
         return np.hstack(encoded_features)
-
-class TaskFocused(feature.Feature):
-    """
-    Task-oriented features focusing on cooking workflow.
-    Includes ingredients, pots, and delivery but minimal spatial info.
-    Missing adjacent tiles information
-    """
-
-    def __init__(self, env, **kwargs):
-        self.agent_features = [
-            features.AgentDir(),
-            overcooked_features.OvercookedInventory(),
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.Onion, n=2),
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.Plate, n=2),
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.OnionStack, n=1),
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.PlateStack, n=1),
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.OnionSoup, n=2),
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.DeliveryZone, n=1),
-            overcooked_features.NClosestPotFeatures(num_pots=1),
-            features.AgentPosition(),
-            features.CanMoveDirection(),
-        ]
-
-        full_shape = np.sum([feat.shape for feat in self.agent_features])
-        super().__init__(
-            low=-np.inf, high=np.inf, shape=(full_shape,),
-            name="task_focused_features", **kwargs,
-        )
-
-    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
-        encoded_features = []
-        for feat in self.agent_features:
-            encoded_features.append(feat.generate(env, player_id))
-        encoding = np.hstack(encoded_features).astype(np.float32)
-        assert np.array_equal(self.shape, encoding.shape)
-        return encoding
-
-
-class ReducedRange(feature.Feature):
-    """
-    Similar to localObs but with reduced sensing range.
-    Tests performance with limited visibility of distant objects.
-    """
-
-    def __init__(self, env, **kwargs):
-        num_agents = env.config["num_agents"]
-
-        self.agent_features = [
-            features.AgentDir(),
-            overcooked_features.OvercookedInventory(),
-            overcooked_features.NextToCounter(),
-            overcooked_features.NextToPot(),
-            # Reduced n values for limited range
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.Onion, n=1),
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.Plate, n=1),
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.PlateStack, n=1),
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.OnionStack, n=1),
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.OnionSoup, n=1),
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.DeliveryZone, n=1),
-            overcooked_features.ClosestObj(focal_object_type=grid_object.Counter, n=1),
-            overcooked_features.NClosestPotFeatures(num_pots=1),  # Only closest pot
-            overcooked_features.DistToOtherPlayers(num_other_players=num_agents - 1),
-            features.AgentPosition(),
-            features.CanMoveDirection(),
-        ]
-
-        full_shape = np.sum([feat.shape for feat in self.agent_features])
-        super().__init__(
-            low=-np.inf, high=np.inf, shape=(full_shape,),
-            name="reduced_range_features", **kwargs,
-        )
-
-    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
-        encoded_features = []
-        for feat in self.agent_features:
-            encoded_features.append(feat.generate(env, player_id))
-        encoding = np.hstack(encoded_features).astype(np.float32)
-        assert np.array_equal(self.shape, encoding.shape)
-        return encoding
-
-class ExtendedRange(feature.Feature):
-    """
-    Enhanced sensing range compared to localObs.
-    Tests if more environmental information improves performance.
-    """
-
-    def __init__(self, env, **kwargs):
-        num_agents = env.config["num_agents"]
-
-        self.agent_features = [
-            features.AgentDir(),
-            overcooked_features.OvercookedInventory(),
-            overcooked_features.NextToCounter(),
-            overcooked_features.NextToPot(),
-            # Extended n values for wider range
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.Onion, n=6),
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.Plate, n=6),
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.PlateStack, n=3),
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.OnionStack, n=3),
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.OnionSoup, n=6),
-            overcooked_features.ClosestObj(focal_object_type=overcooked_grid_objects.DeliveryZone, n=3),
-            overcooked_features.ClosestObj(focal_object_type=grid_object.Counter, n=6),
-            overcooked_features.NClosestPotFeatures(num_pots=3),  # More pots
-            overcooked_features.DistToOtherPlayers(num_other_players=num_agents - 1),
-            features.AgentPosition(),
-            features.CanMoveDirection(),
-        ]
-
-        full_shape = np.sum([feat.shape for feat in self.agent_features])
-        super().__init__(
-            low=-np.inf, high=np.inf, shape=(full_shape,),
-            name="extended_range_features", **kwargs,
-        )
-
-    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
-        encoded_features = []
-        for feat in self.agent_features:
-            encoded_features.append(feat.generate(env, player_id))
-        encoding = np.hstack(encoded_features).astype(np.float32)
-        assert np.array_equal(self.shape, encoding.shape)
-        return encoding
-
 
 class SuccessfullyDeliveredSoup(feature.Feature):
     """
@@ -570,29 +459,14 @@ def _calc_binary_pot_features(pot: overcooked_grid_objects.Pot, agent, grid: cog
     if pot.dish_ready:
         pot_status[0] = 1
     elif len(pot.objects_in_pot) == 0:
+        #pot_status[1] = 1
+        pass
+    elif len(pot.objects_in_pot) > 0:
         pot_status[1] = 1
     elif len(pot.objects_in_pot) == pot.capacity:
         pot_status[2] = 1
     else:
         pot_status[3] = 1
-
-    # Encode the number of each legal content in the pot (size legal_contents)
-    #pot_contents = np.zeros((len(pot.legal_contents),))
-    #item_types_in_pot = [
-    #    pot.legal_contents.index(type(pot_content_obj))
-    #    for pot_content_obj in pot.objects_in_pot
-    #]
-    #for obj_index, obj_count in collections.Counter(item_types_in_pot).items():
-    #    pot_contents[obj_index] = obj_count
-
-    # Encode cooking time (size 1)
-    #pot_cooking_time = np.array(
-    #    (pot.cooking_timer if pot.is_cooking else -1,),
-    #    dtype=np.int32,
-    #)
-
-    # encode the distance from agent to pot (size 2)
-    #pot_distance = np.asarray(agent.pos) - np.asarray(pot.pos)
 
     # encode the pot location (size 2)
     height = grid.height
@@ -611,7 +485,7 @@ def _calc_binary_pot_features(pot: overcooked_grid_objects.Pot, agent, grid: cog
             #pot_cooking_time,
             #pot_distance,
             #pot_location,
-            binary_pot_location,
+            #binary_pot_location,
         ]
     )
 
@@ -643,7 +517,8 @@ class NClosestBinaryPotFeatures(feature.Feature):
         super().__init__(
             low=-np.inf,
             high=np.inf,
-            shape=(num_pots * (11 + grid.height * grid.width),),
+            #shape=(num_pots * (11 + grid.height * grid.width),),
+            shape=(num_pots * (11),),
             name="n_closest_pot_features",
             **kwargs,
         )
@@ -679,3 +554,252 @@ class NClosestBinaryPotFeatures(feature.Feature):
         padded_encoding[: len(encoding)] = encoding
 
         return padded_encoding
+    
+class NextToDeliveryZone(feature.Feature):
+    """
+    One hot feature indicating if the agent is adjacent to a delivery zone.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            low=0,
+            high=1,
+            shape=(4,),
+            name="next_to_delivery_zone",
+            **kwargs,
+        )
+
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        agent = env.grid.grid_agents[player_id]
+        adjacent_positions = [
+            (agent.pos[0] + dx, agent.pos[1] + dy)
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        ]
+        one_hot = np.array([0, 0, 0, 0], dtype=np.float32)
+        for pos in adjacent_positions:
+            tile = env.grid.get(*pos)
+            if isinstance(tile, overcooked_grid_objects.DeliveryZone):
+                if pos == (agent.pos[0] - 1, agent.pos[1]):
+                    one_hot[0] = 1  # Up
+                elif pos == (agent.pos[0] + 1, agent.pos[1]):
+                    one_hot[1] = 1  # Down
+                elif pos == (agent.pos[0], agent.pos[1] - 1):
+                    one_hot[2] = 1  # Left
+                elif pos == (agent.pos[0], agent.pos[1] + 1):
+                    one_hot[3] = 1  # Right
+        return one_hot 
+
+
+class NextToPlateStack(feature.Feature):
+    """
+    Binary feature indicating if the agent is adjacent to a plate stack.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            low=0,
+            high=1,
+            shape=(4,),
+            name="next_to_plate_stack",
+            **kwargs,
+        )
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        agent = env.grid.grid_agents[player_id]
+        adjacent_positions = [
+            (agent.pos[0] + dx, agent.pos[1] + dy)
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        ]
+        one_hot = np.array([0, 0, 0, 0], dtype=np.float32)
+        for pos in adjacent_positions:
+            tile = env.grid.get(*pos)
+            if isinstance(tile, overcooked_grid_objects.PlateStack):
+                if pos == (agent.pos[0] - 1, agent.pos[1]):
+                    one_hot[0] = 1  # Up
+                elif pos == (agent.pos[0] + 1, agent.pos[1]):
+                    one_hot[1] = 1  # Down
+                elif pos == (agent.pos[0], agent.pos[1] - 1):
+                    one_hot[2] = 1  # Left
+                elif pos == (agent.pos[0], agent.pos[1] + 1):
+                    one_hot[3] = 1  # Right
+        return one_hot  
+
+"""
+class Directions(IntEnum):
+    Right = 0  
+    Down = 1
+    Left = 2
+    Up = 3
+
+    Directions.Right: np.array((0, 1)),  # Increase col away from 0
+    Directions.Down: np.array(
+        (1, 0)
+    ),  # Down increases the row number (0 is top)
+    Directions.Left: np.array(
+        (0, -1)
+    ),  # Left decreases the col towards 0
+    Directions.Up: np.array(
+        (-1, 0)
+    ),  # Up decreases the row to 0 (move towards the top)
+
+
+"""
+class HoldingOnionAndFacingPot(feature.Feature):
+    """
+    Binary feature indicating if the agent is holding an onion and adjacent to a pot with an empty slot, and facing that pot.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            low=0,
+            high=1,
+            shape=(1,),
+            name="holding_onion_and_facing_empty_pot",
+            **kwargs,
+        )
+
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        dir_to_vec = {
+            0: (0, 1),  # Right
+            1: (1, 0),  # Down
+            2: (0, -1), # Left
+            3: (-1, 0), # Up
+        }
+        agent = env.grid.grid_agents[player_id]
+        holding_onion = any(
+            [
+                isinstance(obj, overcooked_grid_objects.Onion)
+                for obj in agent.inventory
+            ]
+        )
+        if not holding_onion:
+            return np.array([0], dtype=np.float32)
+        adjacent_positions = [
+            (agent.pos[0] + dx, agent.pos[1] + dy)
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        ]
+        agent_dir = env.env_agents[player_id].dir
+        # the coordinate in front of the agent based on its orientation
+        front_pos = (agent.pos[0] + dir_to_vec[agent_dir][0], agent.pos[1] + dir_to_vec[agent_dir][1])
+        for pos in adjacent_positions:
+            tile = env.grid.get(*pos)
+            if isinstance(tile, overcooked_grid_objects.Pot) and len(tile.objects_in_pot) < tile.capacity and pos == front_pos:
+                return np.array([1], dtype=np.float32)
+        return np.array([0], dtype=np.float32)
+
+class HoldingPlateAndFacingReadyPot(feature.Feature):
+    """
+    Binary feature indicating if the agent is holding a plate and facing a ready pot.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            low=0,
+            high=1,
+            shape=(1,),
+            name="holding_plate_and_facing_ready_pot",
+            **kwargs,
+        )
+
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        dir_to_vec = {
+            0: (0, 1),  # Right
+            1: (1, 0),  # Down 
+            2: (0, -1), # Left
+            3: (-1, 0), # Up
+        }
+        agent = env.grid.grid_agents[player_id]
+        holding_plate = any(
+            [
+                isinstance(obj, overcooked_grid_objects.Plate)
+                for obj in agent.inventory
+            ]
+        )
+        if not holding_plate:
+            return np.array([0], dtype=np.float32)
+
+        adjacent_positions = [
+            (agent.pos[0] + dx, agent.pos[1] + dy)
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        ]
+        agent_dir = env.env_agents[player_id].dir
+        # the coordinate in front of the agent based on its orientation
+        front_pos = (agent.pos[0] + dir_to_vec[agent_dir][0], agent.pos[1] + dir_to_vec[agent_dir][1])
+        for pos in adjacent_positions:
+            tile = env.grid.get(*pos)
+            if isinstance(tile, overcooked_grid_objects.Pot) and tile.dish_ready and pos == front_pos:
+                return np.array([1], dtype=np.float32)
+        return np.array([0], dtype=np.float32)
+    
+class HoldingSoupAndFacingDeliveryZone(feature.Feature):
+    """
+    Binary feature indicating if the agent is holding a soup and adjacent to a delivery zone.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            low=0,
+            high=1,
+            shape=(1,),
+            name="holding_soup_and_next_to_delivery_zone",
+            **kwargs,
+        )
+
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        dir_to_vec = {
+            0: (0, 1),  # Right
+            1: (1, 0),  # Down
+            2: (0, -1), # Left
+            3: (-1, 0), # Up
+        }
+        agent = env.grid.grid_agents[player_id]
+        holding_soup = any(
+            [
+                isinstance(obj, overcooked_grid_objects.OnionSoup)
+                for obj in agent.inventory
+            ]
+        )
+        if not holding_soup:
+            return np.array([0], dtype=np.float32)
+
+        adjacent_positions = [
+            (agent.pos[0] + dx, agent.pos[1] + dy)
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        ]
+        agent_dir = env.env_agents[player_id].dir
+        # the coordinate in front of the agent based on its orientation
+        front_pos = (agent.pos[0] + dir_to_vec[agent_dir][0], agent.pos[1] + dir_to_vec[agent_dir][1])
+        for pos in adjacent_positions:
+            tile = env.grid.get(*pos)
+            if isinstance(tile, overcooked_grid_objects.DeliveryZone) and pos == front_pos:
+                return np.array([1], dtype=np.float32)
+        return np.array([0], dtype=np.float32)
+    
+class HoldingPlateAndPotReady(feature.Feature):
+    """
+    Binary feature indicating if the agent is holding a plate and there is a ready pot adjacent to them.
+    Different thatn HoldingPlateAndFacingReadyPot in that the pot doesn't have to be in front of them, just ready anywhere in the map
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            low=0,
+            high=1,
+            shape=(1,),
+            name="holding_plate_and_pot_ready",
+            **kwargs,
+        )
+
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        agent = env.grid.grid_agents[player_id]
+        holding_plate = any(
+            [
+                isinstance(obj, overcooked_grid_objects.Plate)
+                for obj in agent.inventory
+            ]
+        )
+        if not holding_plate:
+            return np.array([0], dtype=np.float32)
+        for tile in env.grid.grid:
+            if isinstance(tile, overcooked_grid_objects.Pot) and tile.dish_ready:
+                return np.array([1], dtype=np.float32)
+        return np.array([0], dtype=np.float32)

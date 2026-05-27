@@ -97,7 +97,8 @@ N_agent_overcooked_config = {
     # by specifying "onion_in_pot_reward" and "soup_in_dish_reward"
     # in the rewards list below.
     #"rewards": ["delivery_reward"],
-    "rewards": ["onion_in_pot_reward", "soup_in_dish_reward", "delivery_reward"],
+    #"rewards": ["onion_in_pot_reward", "soup_in_dish_reward", "delivery_reward"],
+    "rewards": ["soup_in_dish_reward", "delivery_reward"],
     # The scope is used by CoGrid to determine how to
     # map the ascii text in the layout to the environment
     # objects. All objects are registred in the "overcooked"
@@ -109,7 +110,7 @@ N_agent_overcooked_config = {
     # which could generate a layout dynamically.
     "grid": {"layout": "large_overcooked_layout"},
     # Number of steps per episode.
-    "max_steps": 1000,
+    "max_steps": 200,
     #"num_agents": 4,
 }
 

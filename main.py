@@ -11,7 +11,7 @@ import numpy as np
 
 # import supersuit
 import supersuit as ss
-from model import Agent 
+from model import Agent, AgentDecentralized
 import torch
 import argparse
 from MAPPO import MAPPO
@@ -247,7 +247,7 @@ def main():
         )
     elif args.algorithm == 'mappo' or (args.algorithm == 'mappo' and not args.centralised):
         print('Using decentralised MAPPO')
-        net = Agent(obs_space, action_space, num_agents=args.num_agents, num_envs=args.num_envs).to(device)
+        net = AgentDecentralized(obs_space, action_space, num_agents=args.num_agents, num_envs=args.num_envs).to(device)
         optimizer = torch.optim.Adam(net.parameters(), lr=args.lr, betas=(0.9, 0.95))
         buffer = Buffer(env.observation_spaces[0]['n_agent_overcooked_features'].shape[0], env.config["num_agents"], args.num_envs, max_size=args.num_steps)
         
@@ -294,8 +294,8 @@ def main():
         episode_returns, freq_dict = qmix_environment_loop(agent, vec_env, device, num_episodes=args.num_episodes, log_dir=log_dir, args=args)
     elif args.algorithm == 'sarsa':
         # Semi-Gradient SARSA uses step-based learning
-        num_episode = args.total_steps // 1000  # assuming average episode length of 1000 steps
-        episode_returns, freq_dict = agent_environment_sarsa_loop(agent, vec_env, num_episodes=num_episode, log_dir=log_dir)
+        num_episode = args.total_steps // 200  # assuming average episode length of 200 steps
+        episode_returns  = agent_environment_sarsa_loop(agent, vec_env, num_episodes=num_episode, log_dir=log_dir)
     else:
         # MAPPO/CMAPPO use step-based learning
         episode_returns, freq_dict = agent_environment_loop(agent, vec_env, device, num_update=num_updates, log_dir=log_dir, args=args)
