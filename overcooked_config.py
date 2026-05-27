@@ -6,7 +6,7 @@ from cogrid.envs.overcooked import overcooked
 from cogrid.core import layouts
 from cogrid.envs import registry
 
-from overcooked_features import globalObs, localObs, MinimalSpatial, MinimalSpatialOtherAgentAware, BinaryFeature
+from overcooked_features import globalObs, localObs, MinimalSpatial, MinimalSpatialOtherAgentAware, BinaryFeature, BinaryFeatureV2
 
 # CoGrid is based on a registry system, so we need to register the feature
 # that we want to use for the environment. You can do this in any imported
@@ -29,6 +29,10 @@ feature_space.register_feature(
 
 feature_space.register_feature(
     "Binary_feature", BinaryFeature
+)
+
+feature_space.register_feature(
+    "Binary_feature_v2", BinaryFeatureV2
 )
 
 

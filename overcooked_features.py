@@ -806,3 +806,190 @@ class HoldingPlateAndPotReady(feature.Feature):
             if isinstance(tile, overcooked_grid_objects.Pot) and tile.dish_ready:
                 return np.array([1], dtype=np.float32)
         return np.array([0], dtype=np.float32)
+
+
+# ===========================================================================
+# BinaryFeatureV2
+# ---------------------------------------------------------------------------
+# Same hand-crafted binary "affordance" features as BinaryFeature, plus two
+# additions aimed at generalization and richer value estimation under linear FA:
+#   1. RelativeDirToClosestObj: egocentric direction + distance to the nearest
+#      onion stack / pot / plate stack / delivery zone. Relative geometry => the
+#      navigation signal transfers across layouts (unlike absolute-position
+#      one-hots) and removes the state aliasing that caused walking-in-place.
+#   2. NClosestBinaryPotFeaturesV2: keeps the fixed pot-status one-hot but adds
+#      the onion COUNT (1 vs 2 vs 3) and a COOKING-TIMER bucket ("almost done"),
+#      magnitudes the binary-only encoding threw away. Emits exact dims (the V1
+#      class declared 11/pot but only filled 5, leaving dead zeros).
+# ===========================================================================
+
+
+def _calc_binary_pot_features_v2(pot: overcooked_grid_objects.Pot) -> np.ndarray:
+    """Per-pot binary features, exact size (13), no dead padding.
+
+    reachable(1) + status one-hot(4) + onion-count one-hot(4) + timer bucket(4).
+    """
+    reachable = [1]  # TODO(chase): use search to determine reachability
+
+    # Status one-hot: [empty, partially_filled, cooking, ready] (see _calc_binary_pot_features).
+    status = np.zeros(4, dtype=np.int32)
+    num_in_pot = len(pot.objects_in_pot)
+    if pot.dish_ready:
+        status[3] = 1
+    elif pot.is_cooking:
+        status[2] = 1
+    elif num_in_pot == 0:
+        status[0] = 1
+    else:
+        status[1] = 1
+
+    # Onion-count one-hot: [0, 1, 2, 3]. Distinguishes 1 vs 2 onions, which the
+    # "partially_filled" status bit alone cannot.
+    count = np.zeros(4, dtype=np.int32)
+    count[min(num_in_pot, 3)] = 1
+
+    # Cooking-timer bucket: [not_cooking, t in (20,30], (10,20], (0,10]]. The last
+    # bucket is the "almost ready -> go grab a plate" signal. Timer only counts
+    # down while the pot is full, so it's only meaningful when is_cooking.
+    timer = np.zeros(4, dtype=np.int32)
+    if not pot.is_cooking:
+        timer[0] = 1
+    elif pot.cooking_timer > 20:
+        timer[1] = 1
+    elif pot.cooking_timer > 10:
+        timer[2] = 1
+    else:
+        timer[3] = 1
+
+    return np.hstack([reachable, status, count, timer]).astype(np.float32)
+
+
+class NClosestBinaryPotFeaturesV2(feature.Feature):
+    """Status + onion-count + cooking-timer-bucket for the closest `num_pots` pots."""
+
+    PER_POT = 13
+
+    def __init__(self, num_pots=2, **kwargs):
+        super().__init__(
+            low=0,
+            high=1,
+            shape=(num_pots * self.PER_POT,),
+            name="n_closest_pot_features_v2",
+            **kwargs,
+        )
+        self.num_pots = num_pots
+
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        agent = env.grid.grid_agents[player_id]
+        pots_and_dists = []
+        for grid_obj in env.grid.grid:
+            if not isinstance(grid_obj, overcooked_grid_objects.Pot):
+                continue
+            pots_and_dists.append((euclidian_distance(agent.pos, grid_obj.pos), grid_obj))
+
+        closest_pots = [
+            pot for _, pot in sorted(pots_and_dists, key=lambda x: x[0])[: self.num_pots]
+        ]
+
+        out = np.zeros(self.shape, dtype=np.float32)
+        if closest_pots:
+            enc = np.hstack([_calc_binary_pot_features_v2(pot) for pot in closest_pots])
+            out[: len(enc)] = enc  # zero-pad if the layout has fewer than num_pots pots
+        return out
+
+
+class RelativeDirToClosestObj(feature.Feature):
+    """Egocentric, layout-agnostic encoding of where the nearest object of
+    `focal_object_type` is relative to the agent:
+
+        - row sign one-hot:  [above, same_row, below]                     (3)
+        - col sign one-hot:  [left, same_col, right]                      (3)
+        - Manhattan-distance one-hot: [<=1, 2-3, 4-6, >=7]                (4)
+
+    All zeros if no such object exists. Encoding relative geometry (rather than
+    absolute cells) is what lets a linear policy transfer across layouts.
+    """
+
+    def __init__(self, focal_object_type, name="relative_dir_to_obj", **kwargs):
+        super().__init__(low=0, high=1, shape=(10,), name=name, **kwargs)
+        self.focal_object_type = focal_object_type
+
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        agent = env.grid.grid_agents[player_id]
+        out = np.zeros(self.shape, dtype=np.float32)
+
+        best_obj, best_dist = None, None
+        for grid_obj in env.grid.grid:
+            if not isinstance(grid_obj, self.focal_object_type):
+                continue
+            if np.array_equal(agent.pos, grid_obj.pos):
+                continue
+            d = euclidian_distance(agent.pos, grid_obj.pos)
+            if best_dist is None or d < best_dist:
+                best_dist, best_obj = d, grid_obj
+
+        if best_obj is None:
+            return out
+
+        dr = best_obj.pos[0] - agent.pos[0]  # +ve => target is below (row increases downward)
+        dc = best_obj.pos[1] - agent.pos[1]  # +ve => target is to the right
+
+        out[0], out[1], out[2] = (dr < 0), (dr == 0), (dr > 0)   # above / same / below
+        out[3], out[4], out[5] = (dc < 0), (dc == 0), (dc > 0)   # left / same / right
+
+        manhattan = abs(dr) + abs(dc)
+        if manhattan <= 1:
+            out[6] = 1.0
+        elif manhattan <= 3:
+            out[7] = 1.0
+        elif manhattan <= 6:
+            out[8] = 1.0
+        else:
+            out[9] = 1.0
+        return out
+
+
+class BinaryFeatureV2(feature.Feature):
+    """BinaryFeature + egocentric direction/distance features + richer pot features."""
+
+    def __init__(self, env: cogrid_env.CoGridEnv, **kwargs):
+        self.agent_features = [
+            features.AgentDir(),                          # 4
+            overcooked_features.OvercookedInventory(),    # 3
+            overcooked_features.NextToCounter(),          # 4
+            overcooked_features.NextToPot(),              # 16
+            NClosestBinaryPotFeaturesV2(num_pots=2),      # 26 (status + count + timer, x2 pots)
+            NextToDeliveryZone(),                         # 4
+            NextToPlateStack(),                           # 4
+            HoldingOnionAndFacingPot(),                   # 1
+            HoldingSoupAndFacingDeliveryZone(),           # 1
+            HoldingPlateAndFacingReadyPot(),              # 1
+            HoldingPlateAndPotReady(),                    # 1
+            # NEW: egocentric "which way + how far" to each key target (generalizable).
+            RelativeDirToClosestObj(overcooked_grid_objects.OnionStack, name="dir_to_onion_stack"),    # 10
+            RelativeDirToClosestObj(overcooked_grid_objects.Pot, name="dir_to_pot"),                    # 10
+            RelativeDirToClosestObj(overcooked_grid_objects.PlateStack, name="dir_to_plate_stack"),     # 10
+            RelativeDirToClosestObj(overcooked_grid_objects.DeliveryZone, name="dir_to_delivery_zone"), # 10
+            features.CanMoveDirection(),                  # 4
+        ]
+
+        full_shape = np.sum([feature.shape for feature in self.agent_features])
+
+        super().__init__(
+            low=-np.inf,
+            high=np.inf,
+            shape=(full_shape,),
+            name="n_agent_overcooked_features",
+            **kwargs,
+        )
+
+    def generate(self, env: cogrid_env.CoGridEnv, player_id, **kwargs) -> np.ndarray:
+        encoding = np.hstack([self.generate_player_encoding(env, player_id)]).astype(np.float32)
+        assert np.array_equal(self.shape, encoding.shape)
+        return encoding
+
+    def generate_player_encoding(self, env: cogrid_env.CoGridEnv, player_id: str | int) -> np.ndarray:
+        encoded_features = []
+        for feature in self.agent_features:
+            encoded_features.append(feature.generate(env, player_id))
+        return np.hstack(encoded_features)

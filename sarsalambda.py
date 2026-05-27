@@ -3,7 +3,6 @@ import gymnasium as gym
 import numpy as np
 import matplotlib.pyplot as plt
 from tile_coding import IHT, tiles
-from overcooked_features import BinaryFeature
 from main import make_env
 from tqdm import tqdm
 import cv2
@@ -134,10 +133,10 @@ def main():
         os.makedirs(run_folder)
 
     env = make_env(num_agents=1, layout=args.layout, feature=args.feature, render_mode="rgb_array")
-    binary_feature = BinaryFeature(env)
     episode_rewards = []
-    # Initialization
-    obs_dim = binary_feature.shape[0]  # Observation feature dimension
+    # Observation feature dimension — read from the env's observation space so this
+    # matches whatever --feature is configured (Binary_feature, Binary_feature_v2, ...).
+    obs_dim = env.observation_spaces[0]['n_agent_overcooked_features'].shape[0]
 
     def overcooked_extract_func(obs, action, obs_dim, num_actions=7):
         # one shot of action

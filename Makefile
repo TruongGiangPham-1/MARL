@@ -56,7 +56,9 @@ freeze:
 	python3 freeze_CNN_RL.py --model-path models/decentralised_policy_1_agents_overcooked_cramped_room_v0_seed_7.pth --layout overcooked_cramped_room_v0 --episodes 1000
 
 sarsa-lambda:
-	python3 sarsalambda.py --num_episodes 10000 --alpha 0.1 --lambda_ 0.9 --gamma 0.999 --epsilon 0.1 --data_path sarsa_lambda_data
+	#python3 sarsalambda.py --num_episodes 10000 --alpha 0.1 --lambda_ 0.9 --gamma 0.999 --epsilon 0.1 --data_path sarsa_lambda_data
+	python sarsalambda.py --num_episodes 3000 --alpha 0.005 --epsilon_decay 0.9995 --data_path smoke_test
+
 
 # Test QMIX implementation
 test-qmix:
