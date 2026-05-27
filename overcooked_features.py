@@ -454,19 +454,22 @@ def _calc_binary_pot_features(pot: overcooked_grid_objects.Pot, agent, grid: cog
     # Encode if the pot is reachable (size 1)
     pot_reachable = [1]  # TODO(chase): use search to determine
 
-    # Encode if the pot is empty, cooking, or ready (size 4)
-    pot_status = np.zeros((4,), dtype=np.int32)  # empty, cooking, ready, ptr
+    # One-hot pot status (size 4): [empty, partially_filled, cooking, ready].
+    # These are mutually exclusive: the cooking timer only counts down once the
+    # pot is full (== capacity), so a full pot is always either `is_cooking`
+    # (timer > 0) or `dish_ready` (timer == 0); anything not full is empty or
+    # partially filled. The previous if/elif chain set index 0 for `dish_ready`,
+    # left empty pots all-zero, and never reached indices 2/3 (dead branches).
+    pot_status = np.zeros((4,), dtype=np.int32)
+    num_in_pot = len(pot.objects_in_pot)
     if pot.dish_ready:
-        pot_status[0] = 1
-    elif len(pot.objects_in_pot) == 0:
-        #pot_status[1] = 1
-        pass
-    elif len(pot.objects_in_pot) > 0:
-        pot_status[1] = 1
-    elif len(pot.objects_in_pot) == pot.capacity:
-        pot_status[2] = 1
+        pot_status[3] = 1   # cooked, ready to plate
+    elif pot.is_cooking:
+        pot_status[2] = 1   # full, still cooking
+    elif num_in_pot == 0:
+        pot_status[0] = 1   # empty
     else:
-        pot_status[3] = 1
+        pot_status[1] = 1   # partially filled (0 < n < capacity)
 
     # encode the pot location (size 2)
     height = grid.height

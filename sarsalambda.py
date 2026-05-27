@@ -113,10 +113,12 @@ def main():
 
     parser = argparse.ArgumentParser(description="SARSA Lambda with Tile Coding in Overcooked")
     parser.add_argument("--num_episodes", type=int, default=10000, help="Number of training episodes")
-    parser.add_argument("--alpha", type=float, default=0.1, help="Learning rate")
+    parser.add_argument("--alpha", type=float, default=0.01, help="Learning rate (kept small: Q sums over many active binary features, so the effective step is alpha * n_active)")
     parser.add_argument("--lambda_", type=float, default=0.9, help="Eligibility trace decay rate")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
-    parser.add_argument("--epsilon", type=float, default=0.01, help="Exploration rate")
+    parser.add_argument("--epsilon", type=float, default=0.05, help="Final/minimum exploration rate (floor that epsilon decays down to)")
+    parser.add_argument("--epsilon_start", type=float, default=1.0, help="Initial exploration rate; decays toward --epsilon")
+    parser.add_argument("--epsilon_decay", type=float, default=0.999, help="Per-episode multiplicative decay applied to epsilon (1.0 = constant epsilon)")
     parser.add_argument("--data_path", type=str, default="sarsa_lambda_data", help="Path to save model weights and logs")
     parser.add_argument("--seed", type=int, default=1, help="Random seed for reproducibility")
     parser.add_argument("--layout", type=str, default="overcooked_cramped_room_v0", help="Environment layout")
@@ -165,7 +167,10 @@ def main():
     summary_writer = SummaryWriter(log_dir="sarsa_lambda_logs")
     for episode in tqdm(range(args.num_episodes)):
         obs, _ = env.reset()
-        
+
+        # Decay exploration from epsilon_start toward the epsilon floor.
+        agent.epsilon = max(args.epsilon, args.epsilon_start * (args.epsilon_decay ** episode))
+
         # 1. Pick initial action
         action = agent.choose_action(obs, overcooked_extract_func)
         
@@ -183,7 +188,7 @@ def main():
         while True:
             next_obs, reward, terminated, truncated, _ = env.step({0: action})
             reward = reward[0]  # Assuming reward is a dict with agent IDs as keys
-            done = terminated[0] or truncated[0] or reward == 1  # end episode if delivery reward is received
+            done = terminated[0] or truncated[0]  # run the full episode; deliveries no longer end it
             
             # 3. Pick next action and get next features
             next_action = agent.choose_action(next_obs, overcooked_extract_func)
@@ -219,7 +224,8 @@ def main():
             # save episode_rewards into run folder
             df = pd.DataFrame(episode_rewards)
             df.to_csv(os.path.join(run_folder, 'episode_returns.csv'))
-            print(f"Episode {episode}, Total Reward: {total_reward}")
+            # max|w| flags divergence (should stay bounded); epsilon confirms the decay schedule.
+            print(f"Episode {episode}, Total Reward: {total_reward}, max|w|: {np.max(np.abs(agent.w)):.3f}, epsilon: {agent.epsilon:.3f}, onion_in_pot: {freq_dict['num_onions_in_pot_reward']}")
         if episode % 2000 == 0:
             # run inference every 2000 episodes
             #inference_loop(agent, env, overcooked_extract_func, num_episodes=1, episode_id=episode, data_path=run_folder)
